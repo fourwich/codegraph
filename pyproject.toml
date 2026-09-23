@@ -10,6 +10,9 @@ dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
     "pydantic>=2.5.0",
+    "tree-sitter>=0.22",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-python>=0.23",
 ]
 
 [project.optional-dependencies]

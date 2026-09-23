@@ -13,6 +13,9 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# CodeGraph 本地图库
+.codegraph/
+
 # 环境与密钥
 .env
 .env.local

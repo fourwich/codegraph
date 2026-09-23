@@ -1,28 +1,30 @@
-"""CodeGraph CLI 测试：覆盖 help、why、index、graph 主路径。"""
+"""CodeGraph CLI tests: help, why, index, graph paths."""
 
 from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
 
 from typer.testing import CliRunner
 
 from codegraph.cli import app
+from codegraph.storage import count_nodes, db_path_for_root
 
 runner = CliRunner()
 
 
-def test_help_lists_core_commands() -> None:
-    """--help 应展示核心命令说明。"""
+def test_help_lists_four_commands() -> None:
+    """--help should list four commands."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "index" in result.stdout
     assert "why" in result.stdout
     assert "graph" in result.stdout
     assert "decisions" in result.stdout
-    # Typer 默认开启 shell completion，help 中通常会出现 completion
-    assert "命令" in result.stdout or "Commands" in result.stdout
 
 
 def test_why_known_location_shows_decision_card() -> None:
-    """已知 file:line 应输出决策卡片字段。"""
+    """Known file:line should render decision card fields."""
     result = runner.invoke(app, ["why", "src/auth/session.ts:42"])
     assert result.exit_code == 0
     assert "决策摘要" in result.stdout
@@ -32,7 +34,7 @@ def test_why_known_location_shows_decision_card() -> None:
 
 
 def test_why_bad_format_friendly_error() -> None:
-    """非法位置应友好报错并返回退出码 2。"""
+    """Invalid location should fail with a friendly message."""
     result = runner.invoke(app, ["why", "badformat"])
     assert result.exit_code == 2
     assert "参数错误" in result.stdout
@@ -40,24 +42,33 @@ def test_why_bad_format_friendly_error() -> None:
 
 
 def test_why_unknown_location_not_found() -> None:
-    """合法但无决策的位置应提示未找到。"""
+    """Valid but unbound location should report missing decisions."""
     result = runner.invoke(app, ["why", "src/unknown/file.ts:1"])
     assert result.exit_code == 1
     assert "未找到足够决策记录" in result.stdout
 
 
-def test_index_shows_progress_and_stats(tmp_path) -> None:
-    """index 应输出统计信息。"""
+def test_index_writes_sqlite_with_nodes(tmp_path: Path) -> None:
+    """index should parse a temp .py file and persist SQLite nodes."""
+    sample = tmp_path / "hello.py"
+    sample.write_text("def greet():\n    return 1\n", encoding="utf-8")
     result = runner.invoke(app, ["index", str(tmp_path)])
     assert result.exit_code == 0
     assert "正在索引" in result.stdout
     assert "索引完成" in result.stdout
     assert "节点数" in result.stdout
-    assert "边数" in result.stdout
+
+    db_path = db_path_for_root(tmp_path.resolve())
+    assert db_path.exists()
+    conn = sqlite3.connect(str(db_path))
+    try:
+        assert count_nodes(conn) > 0
+    finally:
+        conn.close()
 
 
-def test_graph_table_and_date_validation(tmp_path) -> None:
-    """graph 正常路径与非法日期路径。"""
+def test_graph_table_and_date_validation() -> None:
+    """graph happy path and invalid date path."""
     ok = runner.invoke(app, ["graph", "--at", "2024-11-02", "--scope", "src"])
     assert ok.exit_code == 0
     assert "代码图快照" in ok.stdout

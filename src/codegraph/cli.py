@@ -5,10 +5,9 @@ from __future__ import annotations
 import typer
 
 from codegraph import __version__
-from codegraph.commands.decisions import decisions_command
 from codegraph.commands.graph import graph_command
 from codegraph.commands.index import index_command
-from codegraph.commands.why import why_command
+from codegraph.commands.why import decisions_command, why_command
 
 app = typer.Typer(
     name="codegraph",
@@ -43,7 +42,6 @@ def main(
     """CodeGraph 命令行工具入口。"""
 
 
-# 注册子命令（保持中文 help，便于 --help）
 app.command(
     name="index",
     help="解析代码 + 摄取 Git 历史 + 写入图（MVP 模拟索引）",
