@@ -1,0 +1,48 @@
+# CodeGraph 比赛材料翻译 Prompt
+
+请把下面的 CodeGraph 项目材料翻译成自然、专业、可直接提交的英文（美式），
+保持技术准确，不要夸大，不要编造数据。术语表：
+- CodeGraph → CodeGraph（产品名不译）
+- 决策记忆层 → decision memory layer
+- 代码图谱 / 代码图 → code graph
+- tree-sitter → tree-sitter（不译）
+- Dgraph → Dgraph（不译）
+- 决策来源卡片 → decision provenance card
+- 时间旅行查询 → time-travel query
+
+---
+
+## 待译：项目描述（约 80 词）
+
+程序员经常问「这段代码为什么这么写？」git blame 只告诉你是谁改的；
+GitHub 搜索只能搜文本；PR 讨论几年后就沉了；ADR 要求人工维护；
+AI 助手通常只看当前文件。CodeGraph 用 tree-sitter 解析代码成 AST，
+把 uses / defined_by 等关系存入图数据库，叠加 Git 时间轴与 PR/Issue/ADR
+决策信息。支持查询任意历史时刻的代码图，也支持查某一行代码背后的决策来源。
+一句话：把代码结构、历史变更和设计决策变成一张可查询的图。
+
+---
+
+## 待译：三条创新点
+
+1. 首次用图数据库原生整合「静态结构 + 设计决策 + Git 时间」，支持多跳关联查询。
+2. 提供 codegraph why <file>:<line>，把一行代码映射到可追溯的决策来源卡片。
+3. 支持 --at 历史时刻查询，回答「当时结构如何、为何如此」，而不是只看 HEAD。
+
+---
+
+## 待译：README 摘要标题与简介
+
+# CodeGraph: the decision memory layer for your code
+
+CodeGraph turns code structure, git history, and design decisions into one queryable graph.
+Ask “why does this line exist?” and get a decision card — not just a blame line.
+
+---
+
+## 输出要求
+
+- 每段给出英文译文
+- 标题保持 Markdown 格式
+- 若中文有歧义，用最保守、可被追问的表述
+- 末尾附「译者注」：3 条你为了准确而做的取舍（中文）
