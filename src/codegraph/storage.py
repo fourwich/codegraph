@@ -1,4 +1,4 @@
-"""SQLite 图存储：节点与边的读写。"""
+"""SQLite graph store: node and edge persistence."""
 
 from __future__ import annotations
 
@@ -31,12 +31,12 @@ CREATE TABLE IF NOT EXISTS edges (
 
 
 def db_path_for_root(root: Path) -> Path:
-    """返回仓库根下的 graph.db 路径。"""
+    """Return graph.db path under the repository root."""
     return root / DEFAULT_DB_REL
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
-    """打开（必要时创建）SQLite 数据库。"""
+    """Open (and create if needed) the SQLite database."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -44,20 +44,20 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """初始化表结构。"""
+    """Create tables when missing."""
     conn.executescript(SCHEMA_SQL)
     conn.commit()
 
 
 def clear_graph(conn: sqlite3.Connection) -> None:
-    """清空旧图数据，准备全量重建。"""
+    """Delete existing graph rows before a full rebuild."""
     conn.execute("DELETE FROM edges")
     conn.execute("DELETE FROM nodes")
     conn.commit()
 
 
 def insert_nodes(conn: sqlite3.Connection, nodes: list[CodeNode]) -> None:
-    """批量写入节点。"""
+    """Bulk insert nodes."""
     conn.executemany(
         "INSERT OR REPLACE INTO nodes "
         "(uid, kind, name, file_path, line_start, line_end, language, parent_uid) "
@@ -80,7 +80,7 @@ def insert_nodes(conn: sqlite3.Connection, nodes: list[CodeNode]) -> None:
 
 
 def insert_edges(conn: sqlite3.Connection, edges: list[Edge]) -> None:
-    """批量写入边。"""
+    """Bulk insert edges."""
     conn.executemany(
         "INSERT INTO edges (from_uid, to_uid, kind, file_path, line) VALUES (?, ?, ?, ?, ?)",
         [(e.from_uid, e.to_uid, e.kind, e.file_path, e.line) for e in edges],
@@ -89,19 +89,19 @@ def insert_edges(conn: sqlite3.Connection, edges: list[Edge]) -> None:
 
 
 def count_nodes(conn: sqlite3.Connection) -> int:
-    """统计节点数。"""
+    """Count stored nodes."""
     row = conn.execute("SELECT COUNT(*) FROM nodes").fetchone()
     return int(row[0]) if row else 0
 
 
 def count_edges(conn: sqlite3.Connection) -> int:
-    """统计边数。"""
+    """Count stored edges."""
     row = conn.execute("SELECT COUNT(*) FROM edges").fetchone()
     return int(row[0]) if row else 0
 
 
 def find_node_at_line(conn: sqlite3.Connection, file_path: str, line: int) -> CodeNode | None:
-    """查找覆盖指定 file:line 的最内层 CodeNode。"""
+    """Return the innermost CodeNode covering file:line."""
     rows = conn.execute(
         "SELECT uid, kind, name, file_path, line_start, line_end, language, parent_uid "
         "FROM nodes WHERE file_path = ? AND line_start <= ? AND line_end >= ? "

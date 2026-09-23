@@ -1,1 +1,1 @@
-"""CodeGraph 子命令包。"""
+"""CodeGraph subcommand package."""

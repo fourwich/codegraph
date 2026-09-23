@@ -1,4 +1,4 @@
-/* CodeGraph 产品站交互：英雄图谱 + 终端演示 */
+/* CodeGraph product site interactions: hero graph + terminal demo */
 
 (function () {
   "use strict";
@@ -18,8 +18,8 @@
     { id: "cls_user", label: "class User", sub: "src/models.ts:12", x: 320, y: 70, type: "code" },
     { id: "var_salt", label: "BCRYPT_ROUNDS", sub: "src/config.ts:8", x: 220, y: 190, type: "code" },
     { id: "fn_hash", label: "hashPassword()", sub: "src/crypto.ts:21", x: 400, y: 210, type: "code" },
-    { id: "dec_01", label: "Decision #01", sub: "为何用 bcrypt", x: 90, y: 280, type: "decision" },
-    { id: "dec_02", label: "Decision #02", sub: "轮数定为 12", x: 300, y: 320, type: "decision" },
+    { id: "dec_01", label: "Decision #01", sub: "Why bcrypt?", x: 90, y: 280, type: "decision" },
+    { id: "dec_02", label: "Decision #02", sub: "Cost factor 12", x: 300, y: 320, type: "decision" },
     { id: "git_t", label: "2024-11-02", sub: "commit a3f91c", x: 430, y: 100, type: "git" },
   ];
 
@@ -80,7 +80,14 @@
       rect.setAttribute("width", w);
       rect.setAttribute("height", h);
       rect.setAttribute("rx", n.type === "decision" ? 8 : 10);
-      rect.setAttribute("fill", n.type === "decision" ? "rgba(255,180,84,0.12)" : n.type === "git" ? "rgba(107,163,255,0.12)" : "rgba(61,255,197,0.1)");
+      rect.setAttribute(
+        "fill",
+        n.type === "decision"
+          ? "rgba(255,180,84,0.12)"
+          : n.type === "git"
+            ? "rgba(107,163,255,0.12)"
+            : "rgba(61,255,197,0.1)"
+      );
       rect.setAttribute("stroke", COLORS[n.type]);
       rect.setAttribute("stroke-width", "1.2");
 
@@ -110,7 +117,7 @@
     });
   }
 
-  // keyframes injected once (SVG attr animation via CSS)
+  // Inject keyframes once (SVG attr animation via CSS)
   const style = document.createElement("style");
   style.textContent = `
     @keyframes dash-in { to { stroke-dashoffset: 0; } }
@@ -125,25 +132,34 @@
   const replayBtn = document.getElementById("replay-btn");
 
   const script = [
-    { kind: "type", html: `<span class="t-prompt">$</span> <span class="t-cmd">codegraph why src/auth.ts:42</span>` },
+    {
+      kind: "type",
+      html: `<span class="t-prompt">$</span> <span class="t-cmd">codegraph why src/auth.ts:42</span>`,
+    },
     { kind: "wait", ms: 350 },
-    { kind: "line", html: `<span class="t-muted">查询图谱… 命中 1 条决策链 · 2 个关联讨论</span>` },
+    {
+      kind: "line",
+      html: `<span class="t-muted">Querying graph… 1 decision chain · 2 linked discussions</span>`,
+    },
     { kind: "wait", ms: 280 },
     {
       kind: "card",
       html: `
         <div class="t-card">
           <div class="t-card__title">DECISION · accepted · 2024-11-02</div>
-          <div class="t-card__row"><strong>内容：</strong>密码哈希使用 bcrypt，成本因子固定为 12</div>
-          <div class="t-card__row"><strong>原因：</strong>兼容既有 User 表；硬件哈希在当时威胁模型下够用</div>
-          <div class="t-card__row"><strong>备选：</strong>Argon2id（否决：迁移成本高）· PBKDF2（否决：库支持弱）</div>
-          <div class="t-card__row"><strong>来源：</strong><span class="t-git">PR #48</span> · Issue #31 · ADR-003</div>
-          <div class="t-card__row"><strong>依据代码：</strong><span class="t-ok">authenticate()</span> · <span class="t-ok">BCRYPT_ROUNDS</span></div>
-          <div class="t-card__row"><strong>状态：</strong>现行有效 · valid_from 2024-11-02</div>
+          <div class="t-card__row"><strong>Decision:</strong> Use bcrypt for password hashing with cost factor 12</div>
+          <div class="t-card__row"><strong>Reason:</strong> Compatible with the existing User table; hardware hashing was enough for the threat model at the time</div>
+          <div class="t-card__row"><strong>Alternatives:</strong> Argon2id (rejected: migration cost) · PBKDF2 (rejected: weaker library support)</div>
+          <div class="t-card__row"><strong>Source:</strong> <span class="t-git">PR #48</span> · Issue #31 · ADR-003</div>
+          <div class="t-card__row"><strong>Supports:</strong> <span class="t-ok">authenticate()</span> · <span class="t-ok">BCRYPT_ROUNDS</span></div>
+          <div class="t-card__row"><strong>Status:</strong> active · valid_from 2024-11-02</div>
         </div>`,
     },
     { kind: "wait", ms: 400 },
-    { kind: "line", html: `<span class="t-muted">下一步：</span><span class="t-git">codegraph decisions --file src/auth.ts --timeline</span>` },
+    {
+      kind: "line",
+      html: `<span class="t-muted">Next:</span> <span class="t-git">codegraph decisions --file src/auth.ts --timeline</span>`,
+    },
   ];
 
   function sleep(ms) {
@@ -155,10 +171,9 @@
     line.className = "t-line";
     terminalBody.appendChild(line);
 
-    // 逐字效果仅对纯文本命令；结构 HTML 用分段淡入更稳
+    // Typewriter only for the command line; other HTML fades in as a block.
     const temp = document.createElement("div");
     temp.innerHTML = html;
-    // 对 command 行做打字机
     if (html.includes("t-cmd")) {
       const prompt = temp.querySelector(".t-prompt");
       const cmd = temp.querySelector(".t-cmd");
@@ -208,7 +223,7 @@
     replayBtn.addEventListener("click", () => runTerminal());
   }
 
-  // 进入视口后自动播放
+  // Auto-play when the terminal enters the viewport
   const term = document.getElementById("cli-terminal");
   if (term && "IntersectionObserver" in window) {
     const io = new IntersectionObserver(

@@ -1,4 +1,4 @@
-"""TypeScript / TSX tree-sitter 解析器。"""
+"""TypeScript / TSX tree-sitter parser."""
 
 from __future__ import annotations
 
@@ -26,12 +26,12 @@ _KIND_MAP = {
 
 
 class TypeScriptParser(BaseParser):
-    """解析 .ts / .tsx，提取声明与调用关系。"""
+    """Parse .ts / .tsx for declarations and call relations."""
 
     language = "typescript"
 
     def parse_file(self, path: Path) -> list[CodeNode]:
-        """解析 TypeScript 源文件。"""
+        """Parse a TypeScript source file."""
         try:
             rel = normalize_location_path(str(path.resolve().relative_to(Path.cwd())))
         except ValueError:
@@ -39,7 +39,7 @@ class TypeScriptParser(BaseParser):
         try:
             source = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
-            logger.warning("读取失败，跳过 %s: %s", path, exc)
+            logger.warning("Read failed, skip %s: %s", path, exc)
             return []
 
         self._calls.clear()
@@ -59,7 +59,7 @@ class TypeScriptParser(BaseParser):
         parent_uid: str | None,
         current_fn: str,
     ) -> None:
-        """深度优先遍历，抽取声明与调用。"""
+        """Depth-first walk collecting declarations and calls."""
         kind = _KIND_MAP.get(node.type)
         name = self._decl_name(node, raw)
         next_parent = parent_uid
@@ -87,7 +87,7 @@ class TypeScriptParser(BaseParser):
         name: str,
         parent_uid: str | None,
     ) -> CodeNode:
-        """构造 CodeNode。"""
+        """Build a CodeNode from an AST node."""
         return CodeNode(
             uid=make_uid(rel, kind, name, node.start_point[0] + 1),
             kind=kind,
@@ -101,7 +101,7 @@ class TypeScriptParser(BaseParser):
 
     @staticmethod
     def _decl_name(node: Node, raw: bytes) -> str | None:
-        """提取声明名；variable_declaration 下钻 declarator。"""
+        """Extract declaration name; variable_declaration digs into declarator."""
         if node.type == "variable_declaration":
             for child in node.children:
                 if child.type == "variable_declarator":
@@ -118,7 +118,7 @@ class TypeScriptParser(BaseParser):
         return raw[name_node.start_byte : name_node.end_byte].decode("utf-8", errors="replace")
 
     def _record_call(self, node: Node, raw: bytes, rel: str, caller_name: str) -> None:
-        """记录 call_expression 的 callee 名称。"""
+        """Record a call_expression with its callee name."""
         fn = node.child_by_field_name("function")
         if fn is None:
             return
@@ -130,7 +130,7 @@ class TypeScriptParser(BaseParser):
 
     @staticmethod
     def _callee_name(fn_node: Node, raw: bytes) -> str | None:
-        """提取 callee 简单名（identifier / member 属性名）。"""
+        """Extract a simple callee name (identifier / member property)."""
         if fn_node.type == "identifier":
             return raw[fn_node.start_byte : fn_node.end_byte].decode("utf-8", errors="replace")
         if fn_node.type == "member_expression":

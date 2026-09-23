@@ -1,4 +1,4 @@
-"""codegraph graph：查看指定时刻的代码图摘要。"""
+"""codegraph graph: historical code-graph snapshot."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def parse_date(raw: str) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise DateError(
-            f"日期「{raw}」格式不正确，请使用 YYYY-MM-DD，例如 2024-11-02"
+            f"Date '{raw}' is invalid. Use YYYY-MM-DD, e.g. 2024-11-02"
         ) from exc
 
 
@@ -52,9 +52,9 @@ def summarize_changes(at: date, decisions: list[Decision]) -> list[str]:
     lines: list[str] = []
     for decision in decisions:
         if decision.timestamp.date() == at:
-            lines.append(f"决策：{decision.content}（{decision.source_ref}）")
+            lines.append(f"Decision: {decision.content} ({decision.source_ref})")
     if not lines:
-        lines.append(f"{at.isoformat()} 时刻无额外变更记录，返回基线图")
+        lines.append(f"No extra changes at {at.isoformat()}; returning baseline graph")
     return lines
 
 
@@ -67,23 +67,56 @@ def build_graph_table(
 ) -> Table:
     """Build the code-graph summary table."""
     table = Table(
-        title=f"代码图快照 · --at {at.isoformat()} · --scope {scope}",
+        title=f"Code graph snapshot · --at {at.isoformat()} · --scope {scope}",
         show_lines=False,
     )
-    table.add_column("指标", style="cyan", no_wrap=True)
-    table.add_column("值", style="white")
-    table.add_column("说明", style="dim")
-    table.add_row("时刻", at.isoformat(), "valid_to 为空表示当前仍有效")
-    table.add_row("节点数", str(node_count), "CodeNode")
-    table.add_row("边数", str(edge_count), "uses / defined_by / contains")
-    table.add_row("决策数", str(len(decisions)), "Decision（不晚于该时刻）")
+    table.add_column("Metric", style="cyan", no_wrap=True)
+    table.add_column("Value", style="white")
+    table.add_column("Notes", style="dim")
+    table.add_row("Date", at.isoformat(), "Empty valid_to means currently active")
+    table.add_row("Nodes", str(node_count), "CodeNode")
+    table.add_row("Edges", str(edge_count), "uses / defined_by / contains")
+    table.add_row("Decisions", str(len(decisions)), "Decision (not after this date)")
     return table
 
 
+def _graph_from_dgraph(at: date, scope: str) -> tuple[int, int, list[Decision]]:
+    """Query Dgraph time-travel snapshot."""
+    from codegraph.graph import DgraphClient, DgraphConnectionError
+
+    try:
+        client = DgraphClient()
+        if not client.ping():
+            console.print(
+                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
+                "Run docker compose up -d first."
+            )
+            raise typer.Exit(code=3)
+        payload = client.query_graph_at(at.isoformat(), scope)
+        client.close()
+    except DgraphConnectionError as exc:
+        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        raise typer.Exit(code=3) from exc
+
+    nodes = payload.get("nodes") or []
+    edge_count = int(payload.get("edge_count") or 0)
+    decisions = filter_decisions_at(SAMPLE_DECISIONS, at)
+    return len(nodes), edge_count, decisions
+
+
 def graph_command(
-    at: str = typer.Option(..., "--at", help="查询时刻，格式 YYYY-MM-DD", metavar="DATE"),
+    at: str = typer.Option(..., "--at", help="Snapshot date, format YYYY-MM-DD", metavar="DATE"),
     scope: str = typer.Option(
-        ".", "--scope", help="路径范围，如 src 或 src/auth", metavar="PATH"
+        ".",
+        "--scope",
+        help="Path scope, e.g. src or src/auth",
+        metavar="PATH",
+    ),
+    backend: str = typer.Option(
+        "sqlite",
+        "--backend",
+        help="Graph backend: sqlite | dgraph",
+        metavar="BACKEND",
     ),
 ) -> None:
     """Print a code-graph snapshot for a historical date and scope.
@@ -91,25 +124,35 @@ def graph_command(
     Args:
         at: Snapshot date (YYYY-MM-DD).
         scope: Path prefix scope.
+        backend: Storage backend, sqlite (default) or dgraph.
     """
     try:
         at_date = parse_date(at)
     except DateError as exc:
-        console.print(f"[bold red]参数错误[/] {exc}")
+        console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
 
-    decisions = filter_decisions_at(SAMPLE_DECISIONS, at_date)
-    stats = load_sqlite_stats()
-    node_count, edge_count = stats if stats else (0, 0)
+    if backend not in {"sqlite", "dgraph"}:
+        console.print(
+            f"[bold red]Invalid argument[/] Unknown backend: {backend} (use sqlite | dgraph)"
+        )
+        raise typer.Exit(code=2)
+
+    if backend == "dgraph":
+        node_count, edge_count, decisions = _graph_from_dgraph(at_date, scope)
+    else:
+        decisions = filter_decisions_at(SAMPLE_DECISIONS, at_date)
+        stats = load_sqlite_stats()
+        node_count, edge_count = stats if stats else (0, 0)
 
     console.print(build_graph_table(at_date, scope, node_count, edge_count, decisions))
     console.print()
-    console.print("[bold cyan]变更摘要[/]")
+    console.print("[bold cyan]Change summary[/]")
     for line in summarize_changes(at_date, decisions):
         console.print(f"  · {line}")
 
 
-app = typer.Typer(help="查询历史时刻的代码图")
+app = typer.Typer(help="Historical code-graph snapshot")
 
 if __name__ == "__main__":
     app()

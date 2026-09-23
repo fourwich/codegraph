@@ -1,7 +1,6 @@
-"""CodeGraph 核心数据模型与内置示例决策数据。
+"""Core data models and bundled sample decisions for CodeGraph.
 
-用 pydantic 描述代码节点、关系边与设计决策；结构数据来自 tree-sitter，
-决策 MVP 阶段仍用示例数据。
+Structure comes from tree-sitter; decisions still use sample data in the MVP.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 class DecisionStatus(str, Enum):
-    """决策生命周期状态。"""
+    """Lifecycle state of a decision."""
 
     ACCEPTED = "accepted"
     SUPERSEDED = "superseded"
@@ -21,7 +20,7 @@ class DecisionStatus(str, Enum):
 
 
 class DecisionSource(str, Enum):
-    """决策来源类型。"""
+    """Where a decision came from."""
 
     PR = "pr"
     ISSUE = "issue"
@@ -31,78 +30,80 @@ class DecisionSource(str, Enum):
 
 
 class CodeNode(BaseModel):
-    """代码结构节点：函数、类、变量或文件。"""
+    """A code structure node: function, class, variable, or file."""
 
-    uid: str = Field(description="稳定标识")
+    uid: str = Field(description="Stable identifier")
     kind: str = Field(description="function / class / variable / file / module")
-    name: str = Field(description="符号名")
-    file_path: str = Field(description="相对仓库根的路径")
-    line_start: int = Field(ge=1, description="起始行")
-    line_end: int = Field(ge=1, description="结束行")
-    language: str = Field(description="源语言")
-    commit_sha: str = Field(default="", description="引入该节点的提交")
-    parent_uid: str | None = Field(default=None, description="父节点 uid，无则为顶层")
+    name: str = Field(description="Symbol name")
+    file_path: str = Field(description="Path relative to the repo root")
+    line_start: int = Field(ge=1, description="Start line")
+    line_end: int = Field(ge=1, description="End line")
+    language: str = Field(description="Source language")
+    commit_sha: str = Field(default="", description="Commit that introduced the node")
+    parent_uid: str | None = Field(default=None, description="Parent node uid; None if top-level")
 
     def contains_line(self, line: int) -> bool:
-        """判断行号是否落在该节点范围内（含端点）。"""
+        """Return True when line falls inside this node (inclusive)."""
         return self.line_start <= line <= self.line_end
 
 
 class Edge(BaseModel):
-    """代码关系边。"""
+    """A relationship between code nodes."""
 
-    from_uid: str = Field(description="起点节点 uid")
-    to_uid: str = Field(description="终点节点 uid")
+    from_uid: str = Field(description="Source node uid")
+    to_uid: str = Field(description="Target node uid")
     kind: str = Field(description="uses / defined_by / contains")
-    file_path: str = Field(default="", description="边所在文件")
-    line: int = Field(default=1, ge=1, description="边所在行")
+    file_path: str = Field(default="", description="File where the edge appears")
+    line: int = Field(default=1, ge=1, description="Line where the edge appears")
 
 
 class Decision(BaseModel):
-    """设计决策：为什么这段代码长成这样。"""
+    """A design decision: why code is written this way."""
 
-    uid: str = Field(description="稳定标识")
-    content: str = Field(description="决策摘要")
-    reason: str = Field(default="", description="原因")
-    alternatives: list[str] = Field(default_factory=list, description="考虑过但否决的方案")
+    uid: str = Field(description="Stable identifier")
+    content: str = Field(description="Decision summary")
+    reason: str = Field(default="", description="Why")
+    alternatives: list[str] = Field(default_factory=list, description="Rejected options")
     status: DecisionStatus = Field(default=DecisionStatus.ACCEPTED)
     source: DecisionSource = Field(default=DecisionSource.ADR)
-    source_ref: str = Field(default="", description="来源引用，如 PR #48")
-    timestamp: datetime = Field(description="决策时间")
-    author: str = Field(default="", description="决策者")
-    file_path: str = Field(default="", description="关联代码位置")
-    line: int | None = Field(default=None, description="关联行号")
-    constraints: list[str] = Field(default_factory=list, description="相关约束")
-    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="可信度 0-1")
+    source_ref: str = Field(default="", description="Source reference, e.g. PR #48")
+    timestamp: datetime = Field(description="Decision time")
+    author: str = Field(default="", description="Author")
+    file_path: str = Field(default="", description="Linked code location")
+    line: int | None = Field(default=None, description="Linked line number")
+    constraints: list[str] = Field(default_factory=list, description="Related constraints")
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence 0-1")
 
     def matches_location(self, file_path: str, line: int) -> bool:
-        """判断决策是否精确绑定到某文件行。"""
+        """Return True when this decision is bound to a file:line."""
         return self.file_path == file_path and self.line == line
 
 
 def normalize_location_path(raw: str) -> str:
-    """把用户输入的路径规范为正斜杠形式，便于和样例数据比对。"""
+    """Normalize a user path to forward slashes for matching."""
     return raw.strip().replace("\\", "/").lstrip("./")
 
 
 def make_uid(file_path: str, kind: str, name: str, line_start: int) -> str:
-    """生成稳定节点 uid。"""
+    """Build a stable node uid."""
     path = normalize_location_path(file_path)
     return f"{path}::{kind}::{name}@{line_start}"
 
 
-# 内置示例决策：按 file:line 精确匹配（3-5 条假数据）
+# Sample decisions matched by exact file:line (demo data, 3-5 items)
 SAMPLE_DECISIONS: list[Decision] = [
     Decision(
         uid="dec-001",
-        content="会话令牌使用有状态 JWT + 服务端黑名单",
+        content="Session tokens use stateful JWT with a server-side denylist",
         reason=(
-            "登录态需要支持「一键全端下线」；纯无状态 JWT 无法即时失效，"
-            "而全量有状态 session 又让网关必须查库。折中：JWT 携带 jti，网关缓存黑名单。"
+            "Login sessions must support sign-out everywhere immediately. "
+            "Pure stateless JWT cannot revoke instantly, while a full server session "
+            "forces every gateway hop to hit the DB. Compromise: JWT carries jti and "
+            "the gateway caches a denylist."
         ),
         alternatives=[
-            "纯无状态 JWT（否决：无法即时踢人）",
-            "服务端全量 Session（否决：网关查库成本高）",
+            "Pure stateless JWT (rejected: cannot kick sessions immediately)",
+            "Full server-side session (rejected: gateway DB cost)",
         ],
         status=DecisionStatus.ACCEPTED,
         source=DecisionSource.PR,
@@ -112,17 +113,23 @@ SAMPLE_DECISIONS: list[Decision] = [
         file_path="src/auth/session.ts",
         line=42,
         constraints=[
-            "兼容移动端旧客户端 header 格式",
-            "P99 鉴权延迟 < 5ms",
-            "密钥轮转不打断进行中会话",
+            "Keep compatibility with legacy mobile client headers",
+            "Auth P99 latency < 5ms",
+            "Key rotation must not drop active sessions",
         ],
         confidence=0.92,
     ),
     Decision(
         uid="dec-002",
-        content="bcrypt 成本因子固定为 12",
-        reason="在当前 CI 机器与登录 QPS 下，12 轮约 80ms，暴力破解成本足够高且登录不卡顿。",
-        alternatives=["Argon2id（否决：迁移哈希成本高）", "PBKDF2（否决：库支持与参数约定更弱）"],
+        content="bcrypt cost factor fixed at 12",
+        reason=(
+            "On current CI machines and login QPS, 12 rounds take about 80ms — "
+            "enough for brute-force resistance without making login feel slow."
+        ),
+        alternatives=[
+            "Argon2id (rejected: hash migration cost)",
+            "PBKDF2 (rejected: weaker library conventions)",
+        ],
         status=DecisionStatus.ACCEPTED,
         source=DecisionSource.ADR,
         source_ref="ADR-003",
@@ -130,14 +137,20 @@ SAMPLE_DECISIONS: list[Decision] = [
         author="security@example.com",
         file_path="src/auth/password.ts",
         line=18,
-        constraints=["与既有 User.password_hash 格式兼容", "登录接口 P95 < 150ms"],
+        constraints=[
+            "Stay compatible with existing User.password_hash format",
+            "Login P95 < 150ms",
+        ],
         confidence=0.88,
     ),
     Decision(
         uid="dec-003",
-        content="缓存键统一带租户前缀",
-        reason="多租户部署时曾出现跨租户脏读；要求所有 Redis key 以 tenant:{id}: 开头，并在写入层强制。",
-        alternatives=["仅在业务层拼前缀（否决：容易漏）"],
+        content="Cache keys always carry a tenant prefix",
+        reason=(
+            "A multi-tenant deploy once produced cross-tenant dirty reads. "
+            "All Redis keys must start with tenant:{id}: and the write path enforces it."
+        ),
+        alternatives=["Prefix only in business code (rejected: easy to forget)"],
         status=DecisionStatus.ACCEPTED,
         source=DecisionSource.ISSUE,
         source_ref="Issue #77",
@@ -145,14 +158,17 @@ SAMPLE_DECISIONS: list[Decision] = [
         author="ops@example.com",
         file_path="src/cache/keys.ts",
         line=7,
-        constraints=["禁止手写裸 key", "灰度期间双写旧键 7 天"],
+        constraints=["Bare keys are forbidden", "Dual-write old keys for 7 days in gray release"],
         confidence=0.95,
     ),
     Decision(
         uid="dec-004",
-        content="分页游标用 (created_at, id) 而非 offset",
-        reason="订单列表深翻页在 offset 大于 10 万后 P99 恶化到 2s；游标分页稳定在 40ms。",
-        alternatives=["offset/limit（否决：深翻页不稳定）"],
+        content="Pagination uses a (created_at, id) cursor instead of offset",
+        reason=(
+            "Deep offset pagination on the order list degraded P99 to 2s past 100k rows; "
+            "cursor pagination stays around 40ms."
+        ),
+        alternatives=["offset/limit (rejected: unstable deep pages)"],
         status=DecisionStatus.ACCEPTED,
         source=DecisionSource.COMMIT,
         source_ref="commit b4c12aa",
@@ -160,34 +176,39 @@ SAMPLE_DECISIONS: list[Decision] = [
         author="backend@example.com",
         file_path="src/api/orders.ts",
         line=63,
-        constraints=["前端保持「加载更多」交互不变"],
+        constraints=["Keep the load-more UX unchanged on the frontend"],
         confidence=0.84,
     ),
     Decision(
         uid="dec-005",
-        content="弃用 V1 双写协议",
-        reason="V1 双写在灰度结束后无流量，继续保留会增加 schema 兼容成本。",
-        alternatives=["永久保留双写（否决：维护成本）"],
+        content="Retire the V1 dual-write protocol",
+        reason=(
+            "V1 dual-write had no traffic after gray release ended; keeping it "
+            "raised schema compatibility cost with no benefit."
+        ),
+        alternatives=["Keep dual-write forever (rejected: maintenance cost)"],
         status=DecisionStatus.SUPERSEDED,
         source=DecisionSource.PR,
-        source_ref="PR #120（取代 ADR-001 双写方案）",
+        source_ref="PR #120 (supersedes ADR-001 dual-write)",
         timestamp=datetime(2025, 5, 9, 14, 0, 0),
         author="arch@example.com",
         file_path="src/api/orders.ts",
         line=63,
-        constraints=["下线前确认监控无 V1 写流量"],
+        constraints=["Confirm zero V1 write traffic in monitoring before removal"],
         confidence=0.75,
     ),
 ]
 
 
 def find_decisions_for_location(file_path: str, line: int) -> list[Decision]:
-    """返回绑定到指定文件行的全部决策。"""
+    """Return all decisions bound to a file:line."""
     return [d for d in SAMPLE_DECISIONS if d.matches_location(file_path, line)]
 
 
 def find_decisions_for_file(file_path: str) -> list[Decision]:
-    """返回绑定到指定文件（或路径前缀）的全部决策。"""
+    """Return all decisions bound to a file (or path prefix)."""
     prefix = normalize_location_path(file_path)
-    matched = [d for d in SAMPLE_DECISIONS if d.file_path == prefix or d.file_path.startswith(prefix)]
+    matched = [
+        d for d in SAMPLE_DECISIONS if d.file_path == prefix or d.file_path.startswith(prefix)
+    ]
     return sorted(matched, key=lambda d: d.timestamp)

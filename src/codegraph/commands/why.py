@@ -1,9 +1,10 @@
-"""codegraph why：查询某行代码背后的决策来源。"""
+"""codegraph why: decision provenance for a source location."""
 
 from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -15,6 +16,8 @@ from rich.text import Text
 from codegraph.models import (
     CodeNode,
     Decision,
+    DecisionSource,
+    DecisionStatus,
     find_decisions_for_file,
     find_decisions_for_location,
     normalize_location_path,
@@ -34,24 +37,26 @@ def parse_location(raw: str) -> tuple[str, int]:
     """Parse `file:line` into (path, line)."""
     value = raw.strip()
     if not value:
-        raise LocationError("位置不能为空，请使用 形如 src/auth/session.ts:42 的格式")
+        raise LocationError(
+            "Location cannot be empty. Use the form src/auth/session.ts:42"
+        )
     match = LOCATION_RE.match(value)
     if not match:
         raise LocationError(
-            f"无法解析位置「{raw}」。正确格式：相对路径:行号，例如 src/auth/session.ts:42"
+            f"Cannot parse location '{raw}'. Expected path:line, e.g. src/auth/session.ts:42"
         )
     line_no = int(match.group("line"))
     if line_no < 1:
-        raise LocationError(f"行号必须大于等于 1，收到：{line_no}")
+        raise LocationError(f"Line number must be >= 1, got: {line_no}")
     return normalize_location_path(match.group("file")), line_no
 
 
 def format_status_label(status_value: str) -> str:
-    """Map decision status to a Chinese label."""
+    """Map decision status to a short label."""
     mapping = {
-        "accepted": "✅ 现行有效",
-        "superseded": "🔁 已被取代",
-        "rejected": "⛔ 已否决",
+        "accepted": "✅ active",
+        "superseded": "🔁 superseded",
+        "rejected": "⛔ rejected",
     }
     return mapping.get(status_value, status_value)
 
@@ -63,7 +68,7 @@ def format_confidence(confidence: float) -> str:
     return f"{stars}  {percent}%"
 
 
-def load_code_node(file_path: str, line: int, root: Path | None = None) -> CodeNode | None:
+def load_code_node_sqlite(file_path: str, line: int, root: Path | None = None) -> CodeNode | None:
     """Load covering CodeNode from SQLite if an index exists."""
     db_path = db_path_for_root(root or Path.cwd())
     if not db_path.exists():
@@ -71,7 +76,7 @@ def load_code_node(file_path: str, line: int, root: Path | None = None) -> CodeN
     try:
         conn = connect(db_path)
     except sqlite3.Error as exc:
-        console.print(f"[yellow]warn[/] 无法打开图数据库 {db_path}: {exc}")
+        console.print(f"[yellow]warn[/] Cannot open graph database {db_path}: {exc}")
         return None
     try:
         return find_node_at_line(conn, file_path, line)
@@ -79,8 +84,75 @@ def load_code_node(file_path: str, line: int, root: Path | None = None) -> CodeN
         conn.close()
 
 
+def load_code_node_dgraph(file_path: str, line: int) -> CodeNode | None:
+    """Load covering CodeNode from Dgraph."""
+    from codegraph.graph import DgraphClient, DgraphConnectionError
+
+    try:
+        client = DgraphClient()
+        if not client.ping():
+            console.print(
+                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
+                "Run docker compose up -d first."
+            )
+            raise typer.Exit(code=3)
+        node = client.query_node_at(file_path, line)
+        client.close()
+    except DgraphConnectionError as exc:
+        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        raise typer.Exit(code=3) from exc
+
+    if not node:
+        return None
+    return CodeNode(
+        uid=str(node.get("node_uid") or node.get("uid") or ""),
+        kind=str(node.get("kind") or ""),
+        name=str(node.get("name") or ""),
+        file_path=str(node.get("file_path") or ""),
+        line_start=int(node.get("line_start") or 1),
+        line_end=int(node.get("line_end") or 1),
+        language=str(node.get("language") or ""),
+        parent_uid=node.get("parent_uid") or None,
+    )
+
+
+def _parse_ts(value: object) -> datetime:
+    """Parse an ISO timestamp or fall back to now."""
+    if isinstance(value, str) and value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc)
+
+
+def decision_from_dgraph(raw: dict) -> Decision:
+    """Convert a Dgraph Decision dict into the pydantic model."""
+    status = str(raw.get("status") or "accepted")
+    source = str(raw.get("source") or "adr")
+    return Decision(
+        uid=str(raw.get("uid") or raw.get("decision_uid") or "dec"),
+        content=str(raw.get("content") or ""),
+        reason=str(raw.get("reason") or ""),
+        alternatives=list(raw.get("alternatives") or []),
+        status=DecisionStatus(status)
+        if status in DecisionStatus._value2member_map_
+        else DecisionStatus.ACCEPTED,
+        source=DecisionSource(source)
+        if source in DecisionSource._value2member_map_
+        else DecisionSource.ADR,
+        source_ref=str(raw.get("source_ref") or ""),
+        timestamp=_parse_ts(raw.get("timestamp")),
+        author=str(raw.get("author") or ""),
+        file_path=str(raw.get("file_path") or ""),
+        line=int(raw["line"]) if raw.get("line") is not None else None,
+        constraints=list(raw.get("constraints") or []),
+        confidence=float(raw.get("confidence") or 0.8),
+    )
+
+
 def render_code_node_header(node: CodeNode) -> None:
-    """Render hit CodeNode summary at the top of the card."""
+    """Render the hit CodeNode summary at the top of the card."""
     panel = Panel(
         Text(
             f"  kind: {node.kind}    name: {node.name}\n"
@@ -88,7 +160,7 @@ def render_code_node_header(node: CodeNode) -> None:
             f"  language: {node.language}",
             style="cyan",
         ),
-        title="[bold]命中 CodeNode[/]",
+        title="[bold]Matched CodeNode[/]",
         border_style="cyan",
         padding=(0, 2),
     )
@@ -98,32 +170,33 @@ def render_code_node_header(node: CodeNode) -> None:
 def build_decision_panel(decision: Decision, file_path: str, line: int) -> Panel:
     """Render one decision as a Rich Panel card."""
     body = Text()
-    body.append("【代码位置】\n", style="bold cyan")
+    body.append("[Location]\n", style="bold cyan")
     body.append(f"  {file_path}:{line}\n")
-    body.append("【决策摘要】\n", style="bold yellow")
+    body.append("[Decision]\n", style="bold yellow")
     body.append(f"  {decision.content}\n")
-    body.append("【原因】\n", style="bold yellow")
-    body.append(f"  {decision.reason or '（未记录）'}\n")
-    body.append("【替代方案】\n", style="bold yellow")
+    body.append("[Reason]\n", style="bold yellow")
+    body.append(f"  {decision.reason or '(not recorded)'}\n")
+    body.append("[Alternatives]\n", style="bold yellow")
     if decision.alternatives:
         for item in decision.alternatives:
             body.append(f"  · {item}\n")
     else:
-        body.append("  （无）\n")
-    body.append("【决策来源】\n", style="bold yellow")
+        body.append("  (none)\n")
+    body.append("[Source]\n", style="bold yellow")
     body.append(f"  {decision.source.value} · {decision.source_ref}\n")
     body.append(
-        f"  作者：{decision.author or '未知'} · 时间：{decision.timestamp.date().isoformat()}\n"
+        f"  author: {decision.author or 'unknown'} · "
+        f"date: {decision.timestamp.date().isoformat()}\n"
     )
-    body.append("【当前状态】\n", style="bold yellow")
+    body.append("[Status]\n", style="bold yellow")
     body.append(f"  {format_status_label(decision.status.value)}\n")
-    body.append("【相关约束】\n", style="bold yellow")
+    body.append("[Constraints]\n", style="bold yellow")
     if decision.constraints:
         for item in decision.constraints:
             body.append(f"  · {item}\n")
     else:
-        body.append("  （无）\n")
-    body.append("【可信度】\n", style="bold yellow")
+        body.append("  (none)\n")
+    body.append("[Confidence]\n", style="bold yellow")
     body.append(f"  {format_confidence(decision.confidence)}\n")
     return Panel(
         body,
@@ -136,38 +209,87 @@ def build_decision_panel(decision: Decision, file_path: str, line: int) -> Panel
 def render_decision_card(file_path: str, line: int, decisions: list[Decision]) -> None:
     """Render decision cards for a location."""
     console.print(
-        f"[bold cyan]查询[/] {file_path}:{line} → 命中 [bold]{len(decisions)}[/] 条决策\n"
+        f"[bold cyan]Query[/] {file_path}:{line} → [bold]{len(decisions)}[/] matched decision(s)\n"
     )
     for decision in decisions:
         console.print(build_decision_panel(decision, file_path, line))
 
 
 def render_not_found(file_path: str, line: int | None = None) -> None:
-    """Render empty-result hint."""
+    """Render the empty-result hint."""
     location = f"{file_path}:{line}" if line is not None else file_path
-    console.print("[bold yellow]未找到足够决策记录[/]")
-    console.print(f"[dim]位置 {location} 暂无绑定的 Decision。可尝试：[/]")
-    console.print("[dim]  codegraph index <repo>   # 先建立索引[/]")
+    console.print("[bold yellow]No decision record found[/]")
+    console.print(f"[dim]No Decision bound to {location}. Try:[/]")
+    console.print("[dim]  codegraph index <repo>   # build the graph first[/]")
     console.print("[dim]  codegraph decisions --file <path> --timeline[/]")
 
 
-def why_command(location: str) -> None:
+def _load_decisions_sqlite(file_path: str, line: int) -> list[Decision]:
+    """Load sample decisions bound to file:line (SQLite mode)."""
+    return find_decisions_for_location(file_path, line)
+
+
+def _load_decisions_dgraph(file_path: str, line: int) -> list[Decision]:
+    """Load decisions from Dgraph for file:line."""
+    from codegraph.graph import DgraphClient, DgraphConnectionError
+
+    try:
+        client = DgraphClient()
+        if not client.ping():
+            console.print(
+                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
+                "Run docker compose up -d first."
+            )
+            raise typer.Exit(code=3)
+        raw_list = client.query_decisions_for(file_path, line)
+        client.close()
+    except DgraphConnectionError as exc:
+        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        raise typer.Exit(code=3) from exc
+
+    if raw_list:
+        return [decision_from_dgraph(item) for item in raw_list]
+    # Fall back to bundled sample decisions so the demo path still works.
+    return find_decisions_for_location(file_path, line)
+
+
+def why_command(
+    location: str,
+    backend: str = typer.Option(
+        "sqlite",
+        "--backend",
+        help="Graph backend: sqlite | dgraph",
+        metavar="BACKEND",
+    ),
+) -> None:
     """Query decision cards for a source location.
 
     Args:
         location: Location string like `src/auth/session.ts:42`.
+        backend: Storage backend, sqlite (default) or dgraph.
     """
     try:
         file_path, line = parse_location(location)
     except LocationError as exc:
-        console.print(f"[bold red]参数错误[/] {exc}")
+        console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
 
-    node = load_code_node(file_path, line)
+    if backend not in {"sqlite", "dgraph"}:
+        console.print(
+            f"[bold red]Invalid argument[/] Unknown backend: {backend} (use sqlite | dgraph)"
+        )
+        raise typer.Exit(code=2)
+
+    if backend == "dgraph":
+        node = load_code_node_dgraph(file_path, line)
+        decisions = _load_decisions_dgraph(file_path, line)
+    else:
+        node = load_code_node_sqlite(file_path, line)
+        decisions = _load_decisions_sqlite(file_path, line)
+
     if node is not None:
         render_code_node_header(node)
 
-    decisions = find_decisions_for_location(file_path, line)
     if not decisions:
         render_not_found(file_path, line)
         raise typer.Exit(code=1)
@@ -176,10 +298,10 @@ def why_command(location: str) -> None:
 
 
 def decisions_command(
-    file: str = typer.Option(..., "--file", help="文件路径", metavar="PATH"),
-    timeline: bool = typer.Option(False, "--timeline", help="按时间顺序展示演化链"),
+    file: str = typer.Option(..., "--file", help="File path", metavar="PATH"),
+    timeline: bool = typer.Option(False, "--timeline", help="Show oldest-first evolution"),
 ) -> None:
-    """List decision evolution for a file.
+    """List the decision evolution timeline for a file.
 
     Args:
         file: Target file path.
@@ -190,11 +312,11 @@ def decisions_command(
         render_not_found(file)
         raise typer.Exit(code=1)
 
-    table = Table(title=f"决策演化 · {file}")
-    table.add_column("时间", style="cyan")
-    table.add_column("状态")
-    table.add_column("摘要", overflow="fold")
-    table.add_column("来源", style="dim")
+    table = Table(title=f"Decision evolution · {file}")
+    table.add_column("Date", style="cyan")
+    table.add_column("Status")
+    table.add_column("Decision", overflow="fold")
+    table.add_column("Source", style="dim")
     ordered = list(rows) if timeline else list(reversed(rows))
     for decision in ordered:
         table.add_row(
@@ -206,7 +328,7 @@ def decisions_command(
     console.print(table)
 
 
-app = typer.Typer(help="查询某行代码背后的决策来源")
+app = typer.Typer(help="Decision provenance for a source line")
 
 if __name__ == "__main__":
     app()

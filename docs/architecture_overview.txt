@@ -1,0 +1,86 @@
+# CodeGraph — Architecture Overview
+
+One-line summary: CodeGraph turns code structure, git history, and design decisions into one queryable graph — so you can ask “why is this line here?” and get a decision card, not just a blame line.
+
+PROBLEM
+Developers constantly ask why code is written a certain way. git blame only names the author. GitHub search is text-only and old PR threads sink. ADR tools require manual writing and drift from code. AI assistants usually see only the current file, not historical constraints or rejected options. The answers exist, but they are scattered across tools and time.
+
+SOLUTION — THREE LAYERS, ONE GRAPH
+1. Structure: tree-sitter parses TypeScript and Python into CodeNodes and edges (uses / defined_by / contains).
+2. Time: Git history attaches validity windows so any date can be queried.
+3. Decisions: PR / issue / ADR notes become Decision nodes linked to the code they justify.
+
+ARCHITECTURE
+
+  +------------------+  +------------------+  +------------------+
+  | Source repo      |  | Git history      |  | PR / Issue / ADR |
+  | (TS / Python)    |  | (commits)        |  | (decisions)      |
+  +--------+---------+  +--------+---------+  +--------+---------+
+           |                     |                     |
+           v                     v                     v
+  +------------------+  +------------------+  +------------------+
+  | tree-sitter      |  | timeline edges   |  | Decision         |
+  | AST + relations  |  | valid_from/to    |  | extractor        |
+  +--------+---------+  +--------+---------+  +--------+---------+
+           |                     |                     |
+           +---------------------+---------------------+
+                                 v
+                    +---------------------------+
+                    | Graph store               |
+                    | SQLite (default)          |
+                    | Dgraph (optional backend) |
+                    +-------------+-------------+
+                                  v
+                    +---------------------------+
+                    | CLI / Web / AI export     |
+                    | why · graph · decisions   |
+                    +---------------------------+
+
+DATA MODEL
+CodeNode
+  uid, kind, name, file_path, line_start, line_end, language
+  parent_uid, commit_sha, valid_from, valid_to
+  uses / defined_by / contains / decided_by
+
+Edge
+  from_uid, to_uid, kind (uses | defined_by | contains), file_path, line
+
+Decision
+  content, reason, alternatives, status, source, source_ref
+  timestamp, author, constraints, confidence
+  justifies -> CodeNode, supersedes -> Decision
+
+SEVEN COMMANDS (MVP ships four)
+  codegraph index <path>              parse + store the graph
+  codegraph why <file>:<line>         decision provenance card
+  codegraph graph --at DATE --scope P historical snapshot
+  codegraph decisions --file PATH     decision evolution timeline
+  codegraph conflicts --scope PATH    contradictory decisions (planned)
+  codegraph export --for-ai           agent context pack (planned)
+  codegraph serve                     local web view (planned)
+
+TECH CHOICES
+tree-sitter   mature multi-language AST without hand-written parsers
+SQLite        zero-ops local store for the MVP path
+Dgraph        native multi-hop graph queries as the optional backend
+Typer + Rich  typed CLI with readable terminal cards
+pydantic      shared models for nodes, edges, and decisions
+pytest        simple, fast unit and CLI tests
+
+STATUS (as of submission)
+  done      product site (index.html / styles.css / main.js)
+  done      CLI: index / why / graph / decisions
+  done      tree-sitter parsing for TypeScript and Python
+  done      SQLite persistence
+  done      16 tests passing
+  sample    one index run: 18 files / 88 nodes / 915 edges
+  in progress   Dgraph backend (optional)
+  planned   web visualization and AI export
+
+ROADMAP
+1. Finish Dgraph multi-hop queries and time-travel filters
+2. Conflict detection across accepted decisions
+3. Local web graph view (Cytoscape.js)
+4. Export packs for coding agents
+
+Built by a 15-year-old self-taught developer.

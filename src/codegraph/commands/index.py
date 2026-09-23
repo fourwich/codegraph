@@ -1,4 +1,4 @@
-"""codegraph index：用 tree-sitter 解析源码并写入 SQLite 图。"""
+"""codegraph index: parse sources and write to SQLite or Dgraph."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
-from codegraph.models import CodeNode, Edge, normalize_location_path
+from codegraph.models import SAMPLE_DECISIONS, CodeNode, Edge, normalize_location_path
 from codegraph.parser.base import BaseParser
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
 from codegraph.storage import (
@@ -26,7 +26,7 @@ from codegraph.storage import (
 console = Console()
 logger = logging.getLogger(__name__)
 
-# 索引时跳过的目录
+# Directories skipped while walking the tree
 SKIP_DIRS = {
     "node_modules",
     ".git",
@@ -42,23 +42,23 @@ SKIP_DIRS = {
 }
 
 INDEX_STEPS: list[str] = [
-    "遍历源码文件",
-    "tree-sitter 解析 AST",
-    "抽取 contains / uses 边",
-    "写入 SQLite 图",
+    "Walk source files",
+    "Parse AST with tree-sitter",
+    "Extract contains / uses edges",
+    "Write graph store",
 ]
 
 
 def resolve_repo_path(path: Path) -> Path:
-    """解析并校验仓库路径。"""
+    """Resolve and validate the repository path."""
     target = path.expanduser().resolve()
     if not target.exists():
-        raise typer.BadParameter(f"路径不存在：{path}")
+        raise typer.BadParameter(f"Path not found: {path}")
     return target
 
 
 def iter_source_files(root: Path) -> list[Path]:
-    """递归收集受支持的源文件，跳过无关目录。"""
+    """Recursively collect supported source files."""
     files: list[Path] = []
     for path in sorted(root.rglob("*")):
         if not path.is_file():
@@ -72,7 +72,7 @@ def iter_source_files(root: Path) -> list[Path]:
 
 
 def parse_all_files(root: Path, files: list[Path]) -> tuple[list[CodeNode], list[Edge]]:
-    """解析全部文件，汇总节点与边；单文件失败仅警告。"""
+    """Parse all files into nodes and edges; skip broken files with a warning."""
     nodes: list[CodeNode] = []
     edges: list[Edge] = []
     parsers: list[BaseParser] = []
@@ -83,9 +83,12 @@ def parse_all_files(root: Path, files: list[Path]) -> tuple[list[CodeNode], list
             continue
         try:
             file_nodes = parser.parse_file(file_path)
-        except Exception as exc:  # noqa: BLE001 — 单文件失败不中断整体索引
-            logger.warning("解析失败，跳过 %s: %s", file_path, exc)
-            console.print(f"[yellow]warn[/] 解析失败，跳过 {normalize_location_path(str(file_path))}: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Parse failed, skip %s: %s", file_path, exc)
+            console.print(
+                f"[yellow]warn[/] Parse failed, skipped "
+                f"{normalize_location_path(str(file_path))}: {exc}"
+            )
             continue
         nodes.extend(file_nodes)
         parsers.append(parser)
@@ -96,7 +99,7 @@ def parse_all_files(root: Path, files: list[Path]) -> tuple[list[CodeNode], list
 
 
 def run_index_progress(steps: list[str]) -> None:
-    """用 Rich 进度条展示索引阶段。"""
+    """Show multi-stage index progress bar."""
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -105,7 +108,7 @@ def run_index_progress(steps: list[str]) -> None:
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        overall = progress.add_task("索引进度", total=len(steps))
+        overall = progress.add_task("Indexing", total=len(steps))
         for step in steps:
             task = progress.add_task(step, total=8)
             for _ in range(8):
@@ -113,8 +116,8 @@ def run_index_progress(steps: list[str]) -> None:
             progress.update(overall, advance=1)
 
 
-def write_graph(db_path: Path, nodes: list[CodeNode], edges: list[Edge]) -> tuple[int, int]:
-    """写入 SQLite 并返回 (节点数, 边数)。"""
+def write_sqlite_graph(db_path: Path, nodes: list[CodeNode], edges: list[Edge]) -> tuple[int, int]:
+    """Persist nodes/edges to SQLite and return counts."""
     conn = connect(db_path)
     try:
         init_schema(conn)
@@ -126,40 +129,101 @@ def write_graph(db_path: Path, nodes: list[CodeNode], edges: list[Edge]) -> tupl
         conn.close()
 
 
+def write_dgraph_graph(nodes: list[CodeNode], edges: list[Edge]) -> tuple[int, int, int]:
+    """Persist nodes/edges/decisions to Dgraph and return counts."""
+    from codegraph.graph import DgraphClient, DgraphConnectionError
+
+    try:
+        client = DgraphClient()
+    except DgraphConnectionError as exc:
+        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        raise typer.Exit(code=3) from exc
+
+    try:
+        if not client.ping():
+            console.print(
+                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
+                "Run docker compose up -d first."
+            )
+            raise typer.Exit(code=3)
+        client.init_schema()
+        for node in nodes:
+            client.upsert_node(node)
+        for edge in edges:
+            client.upsert_edge(edge)
+        for decision in SAMPLE_DECISIONS:
+            client.upsert_decision(decision)
+        return len(nodes), len(edges), len(SAMPLE_DECISIONS)
+    except typer.Exit:
+        raise
+    except DgraphConnectionError as exc:
+        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        raise typer.Exit(code=3) from exc
+    finally:
+        client.close()
+
+
 def index_command(
-    path: Path = typer.Argument(..., help="要索引的仓库或目录路径", metavar="PATH"),
+    path: Path = typer.Argument(..., help="Repository or directory path to index", metavar="PATH"),
+    backend: str = typer.Option(
+        "sqlite",
+        "--backend",
+        help="Graph backend: sqlite | dgraph",
+        metavar="BACKEND",
+    ),
 ) -> None:
-    """解析代码结构并写入本地 SQLite 图（.codegraph/graph.db）。
+    """Parse sources with tree-sitter and persist the code graph.
 
     Args:
-        path: 仓库根目录或子目录。
+        path: Repository root or subdirectory.
+        backend: Storage backend, sqlite (default) or dgraph.
     """
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
     try:
         target = resolve_repo_path(path)
     except typer.BadParameter as exc:
-        console.print(f"[bold red]参数错误[/] {exc}")
+        console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
 
+    if backend not in {"sqlite", "dgraph"}:
+        console.print(
+            f"[bold red]Invalid argument[/] Unknown backend: {backend} (use sqlite | dgraph)"
+        )
+        raise typer.Exit(code=2)
+
     root = target if target.is_dir() else target.parent
-    console.print(f"[bold cyan]正在索引[/] {target} ...")
+    console.print(f"[bold cyan]Indexing[/] {target} ... [dim]backend={backend}[/]")
 
     files = iter_source_files(root)
     run_index_progress(INDEX_STEPS)
     nodes, edges = parse_all_files(root, files)
-    db_path = db_path_for_root(root)
-    node_count, edge_count = write_graph(db_path, nodes, edges)
 
-    console.print()
-    console.print(f"[bold green]索引完成[/]  [bold]{root}[/]")
-    console.print(f"  · 文件数：[bold]{len(files)}[/]")
-    console.print(f"  · 节点数：[bold]{node_count}[/]")
-    console.print(f"  · 边数：[bold]{edge_count}[/]")
-    console.print(f"  · 数据库：[bold]{db_path}[/]")
-    console.print("[dim]下一步：codegraph why <file>:<line>  查看决策卡片[/]")
+    if backend == "dgraph":
+        node_count, edge_count, decision_count = write_dgraph_graph(nodes, edges)
+        console.print()
+        console.print(f"[bold green]Index complete[/]  [bold]{root}[/]  [dim]Dgraph[/]")
+        console.print(f"  · Files: [bold]{len(files)}[/]")
+        console.print(f"  · Nodes: [bold]{node_count}[/]")
+        console.print(f"  · Edges: [bold]{edge_count}[/]")
+        console.print(f"  · Decisions: [bold]{decision_count}[/]")
+        console.print(
+            "  · Dgraph UI: "
+            "[link=http://localhost:8080/?latest]http://localhost:8080/?latest[/link]"
+        )
+    else:
+        db_path = db_path_for_root(root)
+        node_count, edge_count = write_sqlite_graph(db_path, nodes, edges)
+        console.print()
+        console.print(f"[bold green]Index complete[/]  [bold]{root}[/]")
+        console.print(f"  · Files: [bold]{len(files)}[/]")
+        console.print(f"  · Nodes: [bold]{node_count}[/]")
+        console.print(f"  · Edges: [bold]{edge_count}[/]")
+        console.print(f"  · Database: [bold]{db_path}[/]")
+
+    console.print("[dim]Next: codegraph why <file>:<line>  to view a decision card[/]")
 
 
-app = typer.Typer(help="索引代码库（tree-sitter + SQLite）")
+app = typer.Typer(help="Index a codebase (tree-sitter + SQLite/Dgraph)")
 
 if __name__ == "__main__":
     app()

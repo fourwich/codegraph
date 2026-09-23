@@ -1,4 +1,4 @@
-"""Parser 抽象基类：统一多语言 AST 抽取接口。"""
+"""Abstract parser base: shared AST extraction interface."""
 
 from __future__ import annotations
 
@@ -9,33 +9,33 @@ from codegraph.models import CodeNode, Edge
 
 
 class BaseParser(ABC):
-    """语言解析器基类。"""
+    """Base class for language parsers."""
 
     language: str = "unknown"
 
     def __init__(self) -> None:
-        # 记录调用点：(caller_name, callee_name, line, file_path)
+        # Call sites: (caller_name, callee_name, line, file_path)
         self._calls: list[tuple[str, str, int, str]] = []
 
     @abstractmethod
     def parse_file(self, path: Path) -> list[CodeNode]:
-        """解析源文件，返回 CodeNode 列表。
+        """Parse a source file and return CodeNode records.
 
         Args:
-            path: 源文件路径。
+            path: Source file path.
 
         Returns:
-            抽取到的代码节点列表；解析失败可返回空列表。
+            Extracted code nodes; empty list when parsing fails.
         """
 
     def extract_edges(self, nodes: list[CodeNode]) -> list[Edge]:
-        """从节点层级与调用记录中抽取关系边。
+        """Derive relationship edges from hierarchy and call records.
 
         Args:
-            nodes: 已解析的节点列表。
+            nodes: Already parsed nodes.
 
         Returns:
-            contains / defined_by / uses 边。
+            contains / defined_by / uses edges.
         """
         edges: list[Edge] = []
         edges.extend(self._hierarchy_edges(nodes))
@@ -43,7 +43,7 @@ class BaseParser(ABC):
         return edges
 
     def _hierarchy_edges(self, nodes: list[CodeNode]) -> list[Edge]:
-        """由 parent_uid 生成 contains / defined_by 边。"""
+        """Build contains / defined_by edges from parent_uid links."""
         by_uid = {n.uid: n for n in nodes}
         edges: list[Edge] = []
         for node in nodes:
@@ -70,12 +70,11 @@ class BaseParser(ABC):
         return edges
 
     def _call_edges(self, nodes: list[CodeNode]) -> list[Edge]:
-        """把调用点匹配到已知节点，生成 uses 边。"""
+        """Match call sites to known nodes and emit uses edges."""
         by_name: dict[str, list[CodeNode]] = {}
         for node in nodes:
             by_name.setdefault(node.name, []).append(node)
 
-        # uid -> 节点，用于定位 caller
         ordered = sorted(nodes, key=lambda n: (n.line_start, n.line_end))
         edges: list[Edge] = []
         seen: set[tuple[str, str, int]] = set()
@@ -105,15 +104,13 @@ class BaseParser(ABC):
     def _find_caller(
         nodes: list[CodeNode], caller_name: str, line: int, file_path: str
     ) -> CodeNode | None:
-        """找到包含调用行的同名 caller 节点。"""
+        """Find the innermost same-name caller that contains the call line."""
         candidates = [
             n
             for n in nodes
-            if n.name == caller_name
-            and n.file_path == file_path
-            and n.contains_line(line)
+            if n.name == caller_name and n.file_path == file_path and n.contains_line(line)
         ]
         if not candidates:
             return None
-        # 取范围最小的（最内层函数/方法）
+        # Prefer the tightest range (innermost function/method)
         return min(candidates, key=lambda n: n.line_end - n.line_start)

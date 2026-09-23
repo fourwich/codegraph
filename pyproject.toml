@@ -1,7 +1,7 @@
 [project]
 name = "codegraph"
 version = "0.1.0"
-description = "把代码结构、历史变更和设计决策变成一张可查询的图"
+description = "Turn code structure, history, and design decisions into one queryable graph"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -13,12 +13,15 @@ dependencies = [
     "tree-sitter>=0.22",
     "tree-sitter-typescript>=0.23",
     "tree-sitter-python>=0.23",
+    "pydgraph>=23.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
 ]
 
 [project.scripts]

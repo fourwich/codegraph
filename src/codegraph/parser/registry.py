@@ -1,4 +1,4 @@
-"""按文件扩展名选择语言解析器。"""
+"""Select a language parser from the file extension."""
 
 from __future__ import annotations
 
@@ -14,13 +14,13 @@ SUPPORTED_SUFFIXES = TS_SUFFIXES | PY_SUFFIXES
 
 
 def get_parser_for_path(path: Path) -> BaseParser | None:
-    """根据扩展名返回对应解析器；不支持则返回 None。
+    """Return the parser for a path, or None when unsupported.
 
     Args:
-        path: 源文件路径。
+        path: Source file path.
 
     Returns:
-        BaseParser 实例，或 None。
+        A BaseParser instance, or None.
     """
     suffix = path.suffix.lower()
     if suffix in TS_SUFFIXES:
@@ -31,12 +31,12 @@ def get_parser_for_path(path: Path) -> BaseParser | None:
 
 
 def is_supported_source(path: Path) -> bool:
-    """判断是否为受支持的源文件。"""
+    """Return True when the path is a supported source file."""
     return path.suffix.lower() in SUPPORTED_SUFFIXES
 
 
 def language_of(path: Path) -> str:
-    """返回文件对应的逻辑语言名。"""
+    """Return the logical language name for a path."""
     suffix = path.suffix.lower()
     if suffix in TS_SUFFIXES:
         return "typescript"

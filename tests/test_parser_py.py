@@ -10,6 +10,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample.py"
 
 
 def test_py_extracts_functions_and_class() -> None:
+    """Parser should find functions and the Calculator class."""
     parser = PythonParser()
     nodes = parser.parse_file(FIXTURE)
     names = {n.name for n in nodes}
@@ -24,6 +25,7 @@ def test_py_extracts_functions_and_class() -> None:
 
 
 def test_py_extracts_call_edges() -> None:
+    """Parser should emit uses edges for add/multiply calls."""
     parser = PythonParser()
     nodes = parser.parse_file(FIXTURE)
     edges = parser.extract_edges(nodes)

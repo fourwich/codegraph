@@ -1,4 +1,4 @@
-"""CodeGraph CLI tests: help, why, index, graph paths."""
+"""CodeGraph CLI tests: help, why, index, graph, and Dgraph flags."""
 
 from __future__ import annotations
 
@@ -27,17 +27,17 @@ def test_why_known_location_shows_decision_card() -> None:
     """Known file:line should render decision card fields."""
     result = runner.invoke(app, ["why", "src/auth/session.ts:42"])
     assert result.exit_code == 0
-    assert "决策摘要" in result.stdout
-    assert "会话令牌" in result.stdout
-    assert "替代方案" in result.stdout
-    assert "可信度" in result.stdout
+    assert "[Decision]" in result.stdout
+    assert "stateful JWT" in result.stdout
+    assert "[Alternatives]" in result.stdout
+    assert "[Confidence]" in result.stdout
 
 
 def test_why_bad_format_friendly_error() -> None:
     """Invalid location should fail with a friendly message."""
     result = runner.invoke(app, ["why", "badformat"])
     assert result.exit_code == 2
-    assert "参数错误" in result.stdout
+    assert "Invalid argument" in result.stdout
     assert "src/auth/session.ts:42" in result.stdout
 
 
@@ -45,7 +45,7 @@ def test_why_unknown_location_not_found() -> None:
     """Valid but unbound location should report missing decisions."""
     result = runner.invoke(app, ["why", "src/unknown/file.ts:1"])
     assert result.exit_code == 1
-    assert "未找到足够决策记录" in result.stdout
+    assert "No decision record found" in result.stdout
 
 
 def test_index_writes_sqlite_with_nodes(tmp_path: Path) -> None:
@@ -54,9 +54,9 @@ def test_index_writes_sqlite_with_nodes(tmp_path: Path) -> None:
     sample.write_text("def greet():\n    return 1\n", encoding="utf-8")
     result = runner.invoke(app, ["index", str(tmp_path)])
     assert result.exit_code == 0
-    assert "正在索引" in result.stdout
-    assert "索引完成" in result.stdout
-    assert "节点数" in result.stdout
+    assert "Indexing" in result.stdout
+    assert "Index complete" in result.stdout
+    assert "Nodes" in result.stdout
 
     db_path = db_path_for_root(tmp_path.resolve())
     assert db_path.exists()
@@ -71,9 +71,33 @@ def test_graph_table_and_date_validation() -> None:
     """graph happy path and invalid date path."""
     ok = runner.invoke(app, ["graph", "--at", "2024-11-02", "--scope", "src"])
     assert ok.exit_code == 0
-    assert "代码图快照" in ok.stdout
-    assert "变更摘要" in ok.stdout
+    assert "Code graph snapshot" in ok.stdout
+    assert "Change summary" in ok.stdout
 
     bad = runner.invoke(app, ["graph", "--at", "not-a-date", "--scope", "src"])
     assert bad.exit_code == 2
-    assert "日期" in bad.stdout
+    assert "Date" in bad.stdout
+
+
+def test_index_dgraph_backend_connection_failure(tmp_path: Path) -> None:
+    """index --backend dgraph should exit 3 when Dgraph is unreachable."""
+    sample = tmp_path / "hello.py"
+    sample.write_text("def greet():\n    return 1\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["index", str(tmp_path), "--backend", "dgraph"],
+        env={"DGRAPH_ALPHA": "localhost:59999"},
+    )
+    assert result.exit_code == 3
+    assert "Dgraph connection failed" in result.stdout
+
+
+def test_why_dgraph_backend_flag_parsed() -> None:
+    """why should accept --backend dgraph and still parse location args."""
+    result = runner.invoke(
+        app,
+        ["why", "badformat", "--backend", "dgraph"],
+        env={"DGRAPH_ALPHA": "localhost:59999"},
+    )
+    assert result.exit_code == 2
+    assert "Invalid argument" in result.stdout

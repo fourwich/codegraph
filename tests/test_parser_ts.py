@@ -10,6 +10,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample.ts"
 
 
 def test_ts_extracts_functions_and_class() -> None:
+    """Parser should find functions and the Calculator class."""
     parser = TypeScriptParser()
     nodes = parser.parse_file(FIXTURE)
     names = {n.name for n in nodes}
@@ -24,6 +25,7 @@ def test_ts_extracts_functions_and_class() -> None:
 
 
 def test_ts_extracts_call_edges() -> None:
+    """Parser should emit uses edges for add/multiply calls."""
     parser = TypeScriptParser()
     nodes = parser.parse_file(FIXTURE)
     edges = parser.extract_edges(nodes)

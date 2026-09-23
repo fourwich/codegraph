@@ -1,1 +1,1 @@
-"""代码解析器包：tree-sitter 多语言实现。"""
+"""Language parser package: tree-sitter implementations."""

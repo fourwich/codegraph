@@ -1,4 +1,4 @@
-"""Python tree-sitter 解析器。"""
+"""Python tree-sitter parser."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ _KIND_MAP = {
 
 
 class PythonParser(BaseParser):
-    """解析 .py，提取函数/类与调用关系。"""
+    """Parse .py files for functions/classes and call relations."""
 
     language = "python"
 
     def parse_file(self, path: Path) -> list[CodeNode]:
-        """解析 Python 源文件。"""
+        """Parse a Python source file."""
         try:
             rel = normalize_location_path(str(path.resolve().relative_to(Path.cwd())))
         except ValueError:
@@ -36,7 +36,7 @@ class PythonParser(BaseParser):
         try:
             source = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
-            logger.warning("读取失败，跳过 %s: %s", path, exc)
+            logger.warning("Read failed, skip %s: %s", path, exc)
             return []
 
         self._calls.clear()
@@ -55,7 +55,7 @@ class PythonParser(BaseParser):
         parent_uid: str | None,
         current_fn: str,
     ) -> None:
-        """深度优先遍历，抽取声明与调用。"""
+        """Depth-first walk collecting declarations and calls."""
         kind = _KIND_MAP.get(node.type)
         name = self._decl_name(node, raw)
         next_parent = parent_uid
@@ -83,7 +83,7 @@ class PythonParser(BaseParser):
         name: str,
         parent_uid: str | None,
     ) -> CodeNode:
-        """构造 CodeNode。"""
+        """Build a CodeNode from an AST node."""
         return CodeNode(
             uid=make_uid(rel, kind, name, node.start_point[0] + 1),
             kind=kind,
@@ -97,14 +97,14 @@ class PythonParser(BaseParser):
 
     @staticmethod
     def _decl_name(node: Node, raw: bytes) -> str | None:
-        """提取函数或类名。"""
+        """Extract function or class name."""
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return None
         return raw[name_node.start_byte : name_node.end_byte].decode("utf-8", errors="replace")
 
     def _record_call(self, node: Node, raw: bytes, rel: str, caller_name: str) -> None:
-        """记录 call 节点的 callee 名称。"""
+        """Record a call site with its callee name."""
         fn = node.child_by_field_name("function")
         if fn is None:
             return
@@ -116,7 +116,7 @@ class PythonParser(BaseParser):
 
     @staticmethod
     def _callee_name(fn_node: Node, raw: bytes) -> str | None:
-        """提取 callee 简单名（name / attribute 属性名）。"""
+        """Extract a simple callee name (identifier / attribute name)."""
         if fn_node.type == "identifier":
             return raw[fn_node.start_byte : fn_node.end_byte].decode("utf-8", errors="replace")
         if fn_node.type == "attribute":
