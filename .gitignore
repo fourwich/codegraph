@@ -27,3 +27,10 @@ Thumbs.db
 # 编辑器
 .idea/
 .vscode/
+
+# Node / packaging
+node_modules/
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
+vscode-extension/out/
+*.vsix

@@ -29,6 +29,10 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       try {
         const result = await runWhy(cliPath(), file, line, backend());
+        if (!result) {
+          void vscode.window.showWarningMessage("CodeGraph: no result from CLI");
+          return;
+        }
         const panel = vscode.window.createWebviewPanel(
           "codegraphDecision",
           "CodeGraph: Decision",
