@@ -1,0 +1,390 @@
+<!-- AI生成 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeGraph — 代码的决策记忆层</title>
+  <meta name="description" content="把代码结构、历史变更和设计决策变成一张可查询的图。tree-sitter + Dgraph + Git 时间轴。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<p data-aigc-mark="1" style="margin:0 0 8px;font-size:10px;line-height:1.3;color:#6b6560;font-weight:400;">AI生成</p>
+
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="nav">
+    <a class="nav__brand" href="#top">
+      <span class="nav__mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="5" cy="5" r="2.2" fill="currentColor"/>
+          <circle cx="17" cy="5" r="2.2" fill="currentColor"/>
+          <circle cx="11" cy="17" r="2.2" fill="currentColor"/>
+          <path d="M5 5L11 17L17 5" stroke="currentColor" stroke-width="1.2" opacity="0.55"/>
+          <path d="M5 5H17" stroke="currentColor" stroke-width="1.2" opacity="0.35"/>
+        </svg>
+      </span>
+      <span class="nav__name">CodeGraph</span>
+    </a>
+    <nav class="nav__links" aria-label="页面导航">
+      <a href="#problem">问题</a>
+      <a href="#solution">方案</a>
+      <a href="#cli">命令</a>
+      <a href="#schema">图模型</a>
+      <a href="#stack">技术栈</a>
+    </nav>
+    <a class="nav__cta" href="#demo">看 Demo</a>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero__copy">
+        <p class="eyebrow">MVP · MIT · 面向真实痛点的代码图谱</p>
+        <h1>
+          代码的<br />
+          <span class="hero__accent">决策记忆层</span>
+        </h1>
+        <p class="hero__lead">
+          把代码结构、历史变更和设计决策变成一张可查询的图。
+          不只是「谁改的」，更是「为什么这么写」。
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="#demo">60 秒演示</a>
+          <a class="btn btn--ghost" href="#cli">CLI 命令</a>
+        </div>
+        <ul class="hero__tags" aria-label="核心能力">
+          <li>tree-sitter 解析</li>
+          <li>Dgraph 原生图</li>
+          <li>Git 时间旅行</li>
+          <li>决策来源追溯</li>
+        </ul>
+      </div>
+
+      <div class="hero__visual" aria-hidden="true">
+        <div class="graph-stage">
+          <svg class="graph-svg" id="hero-graph" viewBox="0 0 520 420" role="img">
+            <!-- edges drawn by JS for path animation; static fallbacks below -->
+            <g id="graph-edges"></g>
+            <g id="graph-nodes"></g>
+          </svg>
+          <div class="graph-legend">
+            <span><i class="dot dot--code"></i>CodeNode</span>
+            <span><i class="dot dot--decision"></i>Decision</span>
+            <span><i class="dot dot--git"></i>Git 时间轴</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Problem -->
+    <section class="section" id="problem">
+      <div class="section__inner">
+        <p class="section__label">01 — 问题</p>
+        <h2>程序员经常问：<em>这段代码为什么这么写？</em></h2>
+        <p class="section__intro">
+          现有工具各自回答了一小截，却没有把答案串成一条可查询的链路。
+        </p>
+        <div class="pain-grid">
+          <article class="pain-card">
+            <h3>git blame</h3>
+            <p>只告诉你是谁改的，不告诉你为什么改、被什么约束。</p>
+          </article>
+          <article class="pain-card">
+            <h3>GitHub 搜索</h3>
+            <p>只能搜文本。PR 讨论过几年就沉了，检索成本极高。</p>
+          </article>
+          <article class="pain-card">
+            <h3>ADR 工具</h3>
+            <p>要求人手工写。写完和代码脱节，维护成本高、覆盖不全。</p>
+          </article>
+          <article class="pain-card">
+            <h3>AI 编程助手</h3>
+            <p>通常只看当前文件，不懂历史约束和被否决的方案。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Solution -->
+    <section class="section section--alt" id="solution">
+      <div class="section__inner">
+        <p class="section__label">02 — 方案</p>
+        <h2>三层信息，一张图</h2>
+        <p class="section__intro">
+          用 tree-sitter 把代码解析成 AST 与关系边，存入 Dgraph；
+          叠加 Git 时间轴与 PR / Issue / ADR 中的决策信息。
+          支持查询任意历史时刻的代码图，也支持查某一行代码背后的决策来源。
+        </p>
+
+        <div class="arch">
+          <div class="arch__col">
+            <div class="arch__node">
+              <span class="arch__kicker">输入</span>
+              <strong>源码仓库</strong>
+              <span>Python / TypeScript</span>
+            </div>
+            <div class="arch__node">
+              <span class="arch__kicker">输入</span>
+              <strong>Git 历史</strong>
+              <span>commit · blame · diff</span>
+            </div>
+            <div class="arch__node">
+              <span class="arch__kicker">输入</span>
+              <strong>决策源</strong>
+              <span>PR · Issue · ADR</span>
+            </div>
+          </div>
+          <div class="arch__flow" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="arch__col arch__col--mid">
+            <div class="arch__node arch__node--accent">
+              <span class="arch__kicker">解析</span>
+              <strong>tree-sitter</strong>
+              <span>AST · uses · defined_by</span>
+            </div>
+            <div class="arch__node arch__node--accent">
+              <span class="arch__kicker">抽取</span>
+              <strong>Decision Extractor</strong>
+              <span>原因 · 备选 · 状态</span>
+            </div>
+          </div>
+          <div class="arch__flow" aria-hidden="true">
+            <span></span><span></span>
+          </div>
+          <div class="arch__col">
+            <div class="arch__node arch__node--store">
+              <span class="arch__kicker">存储</span>
+              <strong>Dgraph</strong>
+              <span>CodeNode · Decision · Discussion</span>
+            </div>
+            <div class="arch__node arch__node--store">
+              <span class="arch__kicker">出口</span>
+              <strong>CLI · Web · AI Context</strong>
+              <span>why / graph / export</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="why-points">
+          <div class="why-point">
+            <span class="why-point__num">01</span>
+            <div>
+              <h3>历史时刻可查询</h3>
+              <p><code>codegraph graph --at 2024-06-01</code> 取回那一刻的结构快照，而不是今天的 HEAD。</p>
+            </div>
+          </div>
+          <div class="why-point">
+            <span class="why-point__num">02</span>
+            <div>
+              <h3>一行代码 → 决策来源</h3>
+              <p><code>codegraph why file:line</code> 直接吐出决策卡片：原因、备选、讨论、是否已被取代。</p>
+            </div>
+          </div>
+          <div class="why-point">
+            <span class="why-point__num">03</span>
+            <div>
+              <h3>矛盾决策可检测</h3>
+              <p><code>codegraph conflicts</code> 扫描相互冲突的 accepted 决策，避免规则打架。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo / CLI -->
+    <section class="section" id="demo">
+      <div class="section__inner">
+        <p class="section__label">03 — 演示</p>
+        <h2>终端里的一次「为什么」</h2>
+        <p class="section__intro">模拟 <code>codegraph why</code> 的输出形态。真实 CLI 支持 <code>--help</code> 与完整 JSON。</p>
+
+        <div class="terminal" id="cli-terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="terminal__title">codegraph — why</span>
+            <button class="terminal__replay" type="button" id="replay-btn">重播</button>
+          </div>
+          <div class="terminal__body" id="terminal-body" aria-live="polite">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLI contracts -->
+    <section class="section section--alt" id="cli">
+      <div class="section__inner">
+        <p class="section__label">04 — 命令契约</p>
+        <h2>七个核心命令</h2>
+        <p class="section__intro">接口稳定优先。所有命令支持 <code>--help</code>，输出中文说明。</p>
+
+        <div class="cmd-list" id="cmd-list">
+          <article class="cmd">
+            <code class="cmd__name">codegraph index &lt;path&gt;</code>
+            <p>解析代码 + 摄取 Git 历史 + 写入 Dgraph</p>
+            <span class="cmd__flags">--since · --lang</span>
+          </article>
+          <article class="cmd cmd--hl">
+            <code class="cmd__name">codegraph why &lt;file&gt;:&lt;line&gt;</code>
+            <p>返回该行的决策来源卡片</p>
+            <span class="cmd__flags">决策核心</span>
+          </article>
+          <article class="cmd">
+            <code class="cmd__name">codegraph graph --at &lt;date&gt;</code>
+            <p>返回指定时刻的代码图（JSON）</p>
+            <span class="cmd__flags">--scope</span>
+          </article>
+          <article class="cmd">
+            <code class="cmd__name">codegraph decisions --file &lt;path&gt;</code>
+            <p>返回决策演化链</p>
+            <span class="cmd__flags">--timeline</span>
+          </article>
+          <article class="cmd">
+            <code class="cmd__name">codegraph conflicts --scope &lt;path&gt;</code>
+            <p>检测相互矛盾的决策</p>
+            <span class="cmd__flags">状态冲突</span>
+          </article>
+          <article class="cmd">
+            <code class="cmd__name">codegraph export --for-ai</code>
+            <p>导出 AI Agent 可用的上下文包</p>
+            <span class="cmd__flags">--scope</span>
+          </article>
+          <article class="cmd">
+            <code class="cmd__name">codegraph serve</code>
+            <p>启动本地 Web 可视化服务</p>
+            <span class="cmd__flags">Cytoscape.js</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Schema -->
+    <section class="section" id="schema">
+      <div class="section__inner">
+        <p class="section__label">05 — 图模型</p>
+        <h2>三类实体，关系即答案</h2>
+        <p class="section__intro">Schema 是核心契约，改动需评估迁移成本后再确认。</p>
+
+        <div class="schema-grid">
+          <article class="schema-card">
+            <header>
+              <span class="schema-card__type">CodeNode</span>
+              <span class="schema-card__role">结构</span>
+            </header>
+            <ul>
+              <li><span>kind</span> function / class / …</li>
+              <li><span>file_path</span> 源码位置</li>
+              <li><span>valid_from/to</span> 有效期</li>
+              <li><span>uses</span> 引用关系</li>
+              <li><span>decided_by</span> → Decision</li>
+            </ul>
+          </article>
+          <article class="schema-card schema-card--decision">
+            <header>
+              <span class="schema-card__type">Decision</span>
+              <span class="schema-card__role">决策</span>
+            </header>
+            <ul>
+              <li><span>content</span> 做了什么决定</li>
+              <li><span>reason</span> 为什么</li>
+              <li><span>alternatives</span> 否决了什么</li>
+              <li><span>status</span> accepted / superseded</li>
+              <li><span>justifies</span> → CodeNode</li>
+            </ul>
+          </article>
+          <article class="schema-card schema-card--discussion">
+            <header>
+              <span class="schema-card__type">Discussion</span>
+              <span class="schema-card__role">讨论</span>
+            </header>
+            <ul>
+              <li><span>platform</span> github / gitlab</li>
+              <li><span>title</span> 主题</li>
+              <li><span>url</span> 深链</li>
+              <li><span>participants</span> 参与者</li>
+              <li><span>created_at</span> 时间</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="diff">
+          <h3>和现有工具的关系</h3>
+          <div class="diff__grid">
+            <div class="diff__col">
+              <p class="diff__title">现有工具通常是「三选一」</p>
+              <ul>
+                <li>静态代码图 <span>Joern · CodeQL</span></li>
+                <li>决策记录 <span>ADR 工具</span></li>
+                <li>Git 时间旅行 <span>code-nexus</span></li>
+              </ul>
+            </div>
+            <div class="diff__arrow" aria-hidden="true">→</div>
+            <div class="diff__col diff__col--focus">
+              <p class="diff__title">CodeGraph 原生整合</p>
+              <ul>
+                <li>结构 + 决策 + 时间轴</li>
+                <li>同一图上的多跳关联查询</li>
+                <li>CLI / Web / AI 一致接口</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stack -->
+    <section class="section section--alt" id="stack">
+      <div class="section__inner">
+        <p class="section__label">06 — 技术栈</p>
+        <h2>严格遵循，不擅自更换</h2>
+        <p class="section__intro">若认为选型有问题，先说明理由并确认后再改。</p>
+
+        <div class="stack-table" role="table" aria-label="技术选型">
+          <div class="stack-row stack-row--head" role="row">
+            <span role="columnheader">层</span>
+            <span role="columnheader">选型</span>
+            <span role="columnheader">说明</span>
+          </div>
+          <div class="stack-row" role="row"><span>代码解析</span><strong>tree-sitter</strong><span>多语言 AST，最新稳定版</span></div>
+          <div class="stack-row" role="row"><span>图数据库</span><strong>Dgraph</strong><span>v23+，原生图查询</span></div>
+          <div class="stack-row" role="row"><span>CLI</span><strong>Python + Typer</strong><span>Python 3.10+</span></div>
+          <div class="stack-row" role="row"><span>可视化</span><strong>Cytoscape.js</strong><span>本地 Web 图谱</span></div>
+          <div class="stack-row" role="row"><span>可选 LLM</span><strong>Ollama</strong><span>本地优先</span></div>
+          <div class="stack-row" role="row"><span>质量</span><strong>pytest · ruff · mypy</strong><span>覆盖率 &gt; 60%</span></div>
+          <div class="stack-row" role="row"><span>交付</span><strong>GitHub Actions · Docker</strong><span>CI + Dgraph Compose</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Closing -->
+    <section class="section closing">
+      <div class="section__inner closing__inner">
+        <p class="section__label">07 — 一句话</p>
+        <h2 class="closing__title">CodeGraph：代码的决策记忆层</h2>
+        <p class="closing__sub">把「为什么」从沉没的讨论里捞出来，挂回它真正支撑的那行代码上。</p>
+        <div class="closing__actions">
+          <a class="btn btn--primary" href="#demo">回到演示</a>
+          <a class="btn btn--ghost" href="#schema">查看图模型</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <strong>CodeGraph</strong>
+        <span>MVP 开源项目 · MIT License</span>
+      </div>
+      <p class="footer__note">页面为产品说明与演示原型；CLI / Dgraph 集成按项目契约分阶段实现。</p>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
