@@ -1,0 +1,74 @@
+{
+  "name": "codegraph-vscode",
+  "displayName": "CodeGraph",
+  "description": "Show design decisions behind a line of code",
+  "version": "0.1.0",
+  "publisher": "fourwich",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Visualization"],
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codegraph.showDecision",
+        "title": "CodeGraph: Show decision"
+      },
+      {
+        "command": "codegraph.indexWorkspace",
+        "title": "CodeGraph: Index workspace"
+      },
+      {
+        "command": "codegraph.openWebView",
+        "title": "CodeGraph: Open web visualizer"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codegraph.showDecision",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeGraph",
+      "properties": {
+        "codegraph.cliPath": {
+          "type": "string",
+          "default": "codegraph",
+          "description": "Path to the codegraph CLI"
+        },
+        "codegraph.backend": {
+          "type": "string",
+          "enum": ["sqlite", "dgraph"],
+          "default": "sqlite",
+          "description": "Graph backend"
+        },
+        "codegraph.autoIndex": {
+          "type": "boolean",
+          "default": false,
+          "description": "Index workspace on activation"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

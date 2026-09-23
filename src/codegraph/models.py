@@ -1,6 +1,7 @@
 """Core data models and bundled sample decisions for CodeGraph.
 
-Structure comes from tree-sitter; decisions still use sample data in the MVP.
+Structure comes from tree-sitter; decisions may come from git/ADR extraction
+or bundled samples when no repository decisions exist yet.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ class DecisionSource(str, Enum):
 class CodeNode(BaseModel):
     """A code structure node: function, class, variable, or file."""
 
-    uid: str = Field(description="Stable identifier")
+    uid: str = Field(description="Stable identifier including commit when versioned")
     kind: str = Field(description="function / class / variable / file / module")
     name: str = Field(description="Symbol name")
     file_path: str = Field(description="Path relative to the repo root")
@@ -41,6 +42,14 @@ class CodeNode(BaseModel):
     language: str = Field(description="Source language")
     commit_sha: str = Field(default="", description="Commit that introduced the node")
     parent_uid: str | None = Field(default=None, description="Parent node uid; None if top-level")
+    valid_from: datetime = Field(
+        default_factory=lambda: datetime.fromtimestamp(0),
+        description="When this node version became valid",
+    )
+    valid_to: datetime | None = Field(
+        default=None,
+        description="When this version stopped being valid; None means current",
+    )
 
     def contains_line(self, line: int) -> bool:
         """Return True when line falls inside this node (inclusive)."""
@@ -84,13 +93,16 @@ def normalize_location_path(raw: str) -> str:
     return raw.strip().replace("\\", "/").lstrip("./")
 
 
-def make_uid(file_path: str, kind: str, name: str, line_start: int) -> str:
-    """Build a stable node uid."""
+def make_uid(file_path: str, kind: str, name: str, line_start: int, commit_sha: str = "") -> str:
+    """Build a stable node uid, optionally versioned by commit."""
     path = normalize_location_path(file_path)
-    return f"{path}::{kind}::{name}@{line_start}"
+    base = f"{path}::{kind}::{name}@{line_start}"
+    if commit_sha:
+        return f"{base}::{commit_sha[:12]}"
+    return base
 
 
-# Sample decisions matched by exact file:line (demo data, 3-5 items)
+# Sample decisions matched by exact file:line (fallback demo data)
 SAMPLE_DECISIONS: list[Decision] = [
     Decision(
         uid="dec-001",
@@ -201,12 +213,12 @@ SAMPLE_DECISIONS: list[Decision] = [
 
 
 def find_decisions_for_location(file_path: str, line: int) -> list[Decision]:
-    """Return all decisions bound to a file:line."""
+    """Return sample decisions bound to a file:line."""
     return [d for d in SAMPLE_DECISIONS if d.matches_location(file_path, line)]
 
 
 def find_decisions_for_file(file_path: str) -> list[Decision]:
-    """Return all decisions bound to a file (or path prefix)."""
+    """Return sample decisions bound to a file (or path prefix)."""
     prefix = normalize_location_path(file_path)
     matched = [
         d for d in SAMPLE_DECISIONS if d.file_path == prefix or d.file_path.startswith(prefix)

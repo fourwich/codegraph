@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeGraph — Visualizer</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">CodeGraph</div>
+    <div class="slider-wrap">
+      <label for="time">Time</label>
+      <input id="time" type="range" min="0" max="100" value="100" />
+      <span id="time-label">now</span>
+    </div>
+    <div class="stats" id="stats">nodes 0 · edges 0 · decisions 0</div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel left">
+      <h2>Filters</h2>
+      <label>Scope
+        <input id="scope" type="text" placeholder="src" value="src" />
+      </label>
+      <fieldset>
+        <legend>Node kinds</legend>
+        <label><input type="checkbox" class="kind" value="function" checked /> function</label>
+        <label><input type="checkbox" class="kind" value="class" checked /> class</label>
+        <label><input type="checkbox" class="kind" value="variable" checked /> variable</label>
+        <label><input type="checkbox" class="kind" value="method" checked /> method</label>
+      </fieldset>
+      <fieldset>
+        <legend>Decision status</legend>
+        <label><input type="checkbox" class="status" value="accepted" checked /> accepted</label>
+        <label><input type="checkbox" class="status" value="superseded" checked /> superseded</label>
+        <label><input type="checkbox" class="status" value="rejected" checked /> rejected</label>
+      </fieldset>
+      <p class="hint">R reset · F fullscreen · Esc deselect</p>
+    </aside>
+
+    <section id="cy" aria-label="Code graph canvas"></section>
+
+    <aside class="panel right" id="detail">
+      <h2>Details</h2>
+      <div id="detail-body" class="muted">Select a node to view decisions.</div>
+    </aside>
+  </main>
+
+  <footer class="legend">
+    <span><i class="dot code"></i>CodeNode</span>
+    <span><i class="dot decision"></i>Decision</span>
+    <span><i class="dot edge"></i>edges</span>
+    <span class="muted">Local graph · sqlite / dgraph</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

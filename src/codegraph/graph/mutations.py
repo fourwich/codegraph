@@ -19,11 +19,16 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _iso(value: datetime | None) -> str | None:
+    """Serialize an optional datetime."""
+    return value.replace(microsecond=0).isoformat() if value else None
+
+
 def build_node_json(node: CodeNode) -> dict:
     """Convert a CodeNode into Dgraph mutation JSON.
 
     Args:
-        node: Parsed code node.
+        node: Parsed code node (possibly a historical version).
 
     Returns:
         JSON object describing one CodeNode set block.
@@ -36,7 +41,8 @@ def build_node_json(node: CodeNode) -> dict:
         "line_start": int(node.line_start),
         "line_end": int(node.line_end),
         "language": node.language,
-        "valid_from": _now_iso(),
+        "valid_from": _iso(node.valid_from) or _now_iso(),
+        "valid_to": _iso(node.valid_to),
         "commit_sha": node.commit_sha or "",
         "parent_uid": node.parent_uid or "",
     }

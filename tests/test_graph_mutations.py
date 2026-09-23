@@ -17,6 +17,9 @@ def _node() -> CodeNode:
         line_start=1,
         line_end=5,
         language="python",
+        commit_sha="abc123",
+        valid_from=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        valid_to=None,
     )
 
 
@@ -60,10 +63,13 @@ def test_build_node_json_has_required_fields() -> None:
         "line_end",
         "language",
         "valid_from",
+        "commit_sha",
     ):
         assert key in payload
     assert payload["name"] == "foo"
     assert payload["line_start"] == 1
+    assert payload["valid_to"] is None
+    assert payload["commit_sha"] == "abc123"
 
 
 def test_build_edge_json_links_from_to() -> None:

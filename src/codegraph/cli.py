@@ -5,8 +5,11 @@ from __future__ import annotations
 import typer
 
 from codegraph import __version__
+from codegraph.commands.conflicts import conflicts_command
+from codegraph.commands.export import export_command
 from codegraph.commands.graph import graph_command
 from codegraph.commands.index import index_command
+from codegraph.commands.serve import serve_command
 from codegraph.commands.why import decisions_command, why_command
 
 app = typer.Typer(
@@ -65,6 +68,24 @@ app.command(
     help="List the decision evolution timeline for a file",
     rich_help_panel="Core commands",
 )(decisions_command)
+
+app.command(
+    name="conflicts",
+    help="Detect contradictory accepted decisions in a scope",
+    rich_help_panel="Core commands",
+)(conflicts_command)
+
+app.command(
+    name="export",
+    help="Export an AI-agent context pack (--for-ai --scope <path>)",
+    rich_help_panel="Core commands",
+)(export_command)
+
+app.command(
+    name="serve",
+    help="Start the local Cytoscape web visualizer",
+    rich_help_panel="Core commands",
+)(serve_command)
 
 
 if __name__ == "__main__":

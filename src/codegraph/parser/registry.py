@@ -5,12 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 
 from codegraph.parser.base import BaseParser
+from codegraph.parser.treesitter_cpp import CppParser
+from codegraph.parser.treesitter_go import GoParser
+from codegraph.parser.treesitter_java import JavaParser
 from codegraph.parser.treesitter_py import PythonParser
+from codegraph.parser.treesitter_rust import RustParser
 from codegraph.parser.treesitter_ts import TypeScriptParser
 
 TS_SUFFIXES = {".ts", ".tsx"}
 PY_SUFFIXES = {".py"}
-SUPPORTED_SUFFIXES = TS_SUFFIXES | PY_SUFFIXES
+JAVA_SUFFIXES = {".java"}
+GO_SUFFIXES = {".go"}
+RUST_SUFFIXES = {".rs"}
+CPP_SUFFIXES = {".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h"}
+SUPPORTED_SUFFIXES = (
+    TS_SUFFIXES | PY_SUFFIXES | JAVA_SUFFIXES | GO_SUFFIXES | RUST_SUFFIXES | CPP_SUFFIXES
+)
 
 
 def get_parser_for_path(path: Path) -> BaseParser | None:
@@ -27,6 +37,14 @@ def get_parser_for_path(path: Path) -> BaseParser | None:
         return TypeScriptParser()
     if suffix in PY_SUFFIXES:
         return PythonParser()
+    if suffix in JAVA_SUFFIXES:
+        return JavaParser()
+    if suffix in GO_SUFFIXES:
+        return GoParser()
+    if suffix in RUST_SUFFIXES:
+        return RustParser()
+    if suffix in CPP_SUFFIXES:
+        return CppParser()
     return None
 
 
@@ -42,4 +60,12 @@ def language_of(path: Path) -> str:
         return "typescript"
     if suffix in PY_SUFFIXES:
         return "python"
+    if suffix in JAVA_SUFFIXES:
+        return "java"
+    if suffix in GO_SUFFIXES:
+        return "go"
+    if suffix in RUST_SUFFIXES:
+        return "rust"
+    if suffix in CPP_SUFFIXES:
+        return "cpp"
     return "unknown"

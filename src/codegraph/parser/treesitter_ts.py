@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from tree_sitter import Language, Node, Parser
@@ -31,7 +32,7 @@ class TypeScriptParser(BaseParser):
     language = "typescript"
 
     def parse_file(self, path: Path) -> list[CodeNode]:
-        """Parse a TypeScript source file."""
+        """Parse a TypeScript source file from disk."""
         try:
             rel = normalize_location_path(str(path.resolve().relative_to(Path.cwd())))
         except ValueError:
@@ -41,13 +42,33 @@ class TypeScriptParser(BaseParser):
         except (OSError, UnicodeDecodeError) as exc:
             logger.warning("Read failed, skip %s: %s", path, exc)
             return []
+        return self.parse_text(rel, source)
 
+    def parse_text(
+        self,
+        rel_path: str,
+        source: str,
+        commit_sha: str = "",
+        valid_from: datetime | None = None,
+    ) -> list[CodeNode]:
+        """Parse TypeScript source text into CodeNode records."""
+        rel = normalize_location_path(rel_path)
         self._calls.clear()
         raw = source.encode("utf-8")
-        lang = _TSX_LANGUAGE if path.suffix.lower() == ".tsx" else _TS_LANGUAGE
+        suffix = Path(rel_path).suffix.lower()
+        lang = _TSX_LANGUAGE if suffix == ".tsx" else _TS_LANGUAGE
         tree = Parser(lang).parse(raw)
         out: list[CodeNode] = []
-        self._walk(tree.root_node, raw, rel, out, parent_uid=None, current_fn="")
+        self._walk(
+            tree.root_node,
+            raw,
+            rel,
+            out,
+            parent_uid=None,
+            current_fn="",
+            commit_sha=commit_sha,
+            valid_from=valid_from,
+        )
         return out
 
     def _walk(
@@ -58,6 +79,8 @@ class TypeScriptParser(BaseParser):
         out: list[CodeNode],
         parent_uid: str | None,
         current_fn: str,
+        commit_sha: str = "",
+        valid_from: datetime | None = None,
     ) -> None:
         """Depth-first walk collecting declarations and calls."""
         kind = _KIND_MAP.get(node.type)
@@ -66,7 +89,9 @@ class TypeScriptParser(BaseParser):
         next_fn = current_fn
 
         if kind and name:
-            code_node = self._make_node(node, rel, kind, name, parent_uid)
+            code_node = self._make_node(
+                node, rel, kind, name, parent_uid, commit_sha, valid_from
+            )
             out.append(code_node)
             if kind in {"class", "function"}:
                 next_parent = code_node.uid
@@ -77,7 +102,16 @@ class TypeScriptParser(BaseParser):
             self._record_call(node, raw, rel, current_fn if current_fn else name or "")
 
         for child in node.children:
-            self._walk(child, raw, rel, out, next_parent, next_fn)
+            self._walk(
+                child,
+                raw,
+                rel,
+                out,
+                next_parent,
+                next_fn,
+                commit_sha=commit_sha,
+                valid_from=valid_from,
+            )
 
     def _make_node(
         self,
@@ -86,10 +120,12 @@ class TypeScriptParser(BaseParser):
         kind: str,
         name: str,
         parent_uid: str | None,
+        commit_sha: str = "",
+        valid_from: datetime | None = None,
     ) -> CodeNode:
         """Build a CodeNode from an AST node."""
         return CodeNode(
-            uid=make_uid(rel, kind, name, node.start_point[0] + 1),
+            uid=make_uid(rel, kind, name, node.start_point[0] + 1, commit_sha),
             kind=kind,
             name=name,
             file_path=rel,
@@ -97,6 +133,9 @@ class TypeScriptParser(BaseParser):
             line_end=node.end_point[0] + 1,
             language=self.language,
             parent_uid=parent_uid,
+            commit_sha=commit_sha,
+            valid_from=valid_from or datetime.fromtimestamp(0),
+            valid_to=None,
         )
 
     @staticmethod

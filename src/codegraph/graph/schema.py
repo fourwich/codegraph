@@ -37,6 +37,7 @@ type CodeNode {
   decided_by
 }
 
+decision_uid: string @index(exact) .
 content: string @index(fulltext) .
 reason: string .
 alternatives: [string] .
@@ -51,6 +52,7 @@ justifies: [uid] @reverse .
 supersedes: [uid] @reverse .
 
 type Decision {
+  decision_uid
   content
   reason
   alternatives

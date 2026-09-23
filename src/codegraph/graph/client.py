@@ -30,12 +30,14 @@ query node_at($path: string, $line: int) {
     line_start
     line_end
     language
+    valid_from
+    valid_to
+    commit_sha
     parent_uid
   }
 }
 """
 
-# Decisions that justify a node at file:line (reverse edge lookup).
 Q_DECISIONS_FOR = """
 query decisions_for($path: string, $line: int) {
   nodes(func: eq(file_path, $path))
@@ -44,6 +46,7 @@ query decisions_for($path: string, $line: int) {
     node_uid
     ~justifies {
       uid
+      decision_uid
       content
       reason
       alternatives
@@ -60,12 +63,9 @@ query decisions_for($path: string, $line: int) {
 """
 
 Q_GRAPH_AT = """
-query graph_at($when: string, $scope: string) {
+query graph_at($when: string) {
   nodes(func: has(valid_from))
-    @filter(
-      le(valid_from, $when)
-      AND (NOT has(valid_to) OR ge(valid_to, $when))
-    ) {
+    @filter(le(valid_from, $when) AND (NOT has(valid_to) OR ge(valid_to, $when))) {
     uid
     node_uid
     kind
@@ -75,12 +75,20 @@ query graph_at($when: string, $scope: string) {
     line_end
     valid_from
     valid_to
+    uses { uid node_uid }
+    defined_by { uid node_uid }
+    contains { uid node_uid }
   }
 }
 """
 
-Q_COUNT_USES = "query { q(func: has(uses)) { count(uid) } }"
-Q_COUNT_DECISIONS = "query { q(func: has(content)) { count(uid) } }"
+Q_COUNT_DECISIONS = "query { q(func: has(decision_uid)) { count(uid) } }"
+Q_ALL_DECISIONS = """
+query { q(func: has(decision_uid)) {
+  uid decision_uid content reason alternatives status source source_ref
+  timestamp author constraints confidence
+} }
+"""
 
 Q_FIND_NODE = "query { q as var(func: eq(node_uid, $key)) }"
 Q_FIND_DECISION = "query { q as var(func: eq(decision_uid, $key)) }"
@@ -139,43 +147,49 @@ class DgraphClient:
         except Exception as exc:  # noqa: BLE001
             raise DgraphConnectionError(f"drop_all failed: {exc}") from exc
 
-    def upsert_node(self, node: CodeNode) -> None:
-        """Insert or update one CodeNode keyed by node_uid."""
+    def upsert_node(self, node: CodeNode) -> str:
+        """Insert or update one CodeNode keyed by node_uid.
+
+        Returns:
+            Business node uid (not a Dgraph 0x uid).
+        """
         payload = build_node_json(node)
         key = payload["node_uid"]
         set_json = json.dumps([{"uid": "uid(q)", **payload}]).encode("utf-8")
-        blank_json = json.dumps([{"uid": f"_:{key}", **payload}]).encode("utf-8")
+        blank_json = json.dumps([{"uid": f"_:{_safe_blank(key)}", **payload}]).encode("utf-8")
         self._upsert(
             query=Q_FIND_NODE,
             vars_={"$key": key},
             insert_if_missing=(set_json, blank_json),
             insert_always=None,
         )
+        return key
 
-    def upsert_edge(self, edge: Edge) -> None:
+    def upsert_edge(self, edge: Edge, from_uid: str = "", to_uid: str = "") -> None:
         """Link two existing nodes with a typed edge."""
-        payload = build_edge_json(edge, edge.from_uid, edge.to_uid)
+        src = from_uid or edge.from_uid
+        dst = to_uid or edge.to_uid
+        payload = build_edge_json(edge, src, dst)
         predicate = payload["predicate"]
         set_json = json.dumps(
             [{"uid": "uid(a)", predicate: [{"uid": "uid(b)"}]}]
         ).encode("utf-8")
         self._upsert(
             query=Q_LINK_EDGE,
-            vars_={"$from_uid": edge.from_uid, "$to_uid": edge.to_uid},
+            vars_={"$from_uid": src, "$to_uid": dst},
             insert_if_missing=None,
             insert_always=set_json,
         )
 
-    def upsert_decision(self, decision: Decision) -> None:
+    def upsert_decision(self, decision: Decision, target_uid: str | None = None) -> None:
         """Insert or update one Decision and optional justifies edge."""
-        target_uid = None
-        if decision.file_path and decision.line is not None:
+        if target_uid is None and decision.file_path and decision.line is not None:
             target_uid = self._find_node_uid(decision.file_path, decision.line)
         payload = build_decision_json(decision, target_uid)
         payload.pop("justifies_uid", None)
         key = payload["decision_uid"]
         set_json = json.dumps([{"uid": "uid(q)", **payload}]).encode("utf-8")
-        blank_json = json.dumps([{"uid": f"_:{key}", **payload}]).encode("utf-8")
+        blank_json = json.dumps([{"uid": f"_:{_safe_blank(key)}", **payload}]).encode("utf-8")
         self._upsert(
             query=Q_FIND_DECISION,
             vars_={"$key": key},
@@ -203,18 +217,21 @@ class DgraphClient:
                 found.append(decision)
         return found
 
+    def query_all_decisions(self) -> list[dict[str, Any]]:
+        """Return every Decision node (used by conflicts/export)."""
+        result = self._query(Q_ALL_DECISIONS, {})
+        return list(result.get("q") or [])
+
     def query_graph_at(self, at_date: str, scope: str) -> dict[str, Any]:
         """Return graph snapshot valid at at_date, filtered by file_path scope."""
-        result = self._query(Q_GRAPH_AT, {"$when": at_date, "$scope": scope})
+        result = self._query(Q_GRAPH_AT, {"$when": at_date})
         nodes = result.get("nodes") or []
-        if scope and scope not in {".", ""}:
-            prefix = scope.replace("\\", "/").rstrip("/")
+        prefix = (scope or "").replace("\\", "/").rstrip("/")
+        if prefix and prefix not in {".", ""}:
             nodes = [n for n in nodes if str(n.get("file_path", "")).startswith(prefix)]
-        return {
-            "nodes": nodes,
-            "edge_count": self._count_uses(),
-            "decision_count": self._count_decisions(),
-        }
+        edge_count = _count_live_edges(nodes)
+        decision_count = self._count_decisions()
+        return {"nodes": nodes, "edge_count": edge_count, "decision_count": decision_count}
 
     def close(self) -> None:
         """Close the gRPC stub."""
@@ -244,7 +261,9 @@ class DgraphClient:
                 )
             if insert_always is not None:
                 mutations.append(txn.create_mutation(set_json=insert_always))
-            request = txn.create_request(query=query, vars=vars_, mutations=mutations, commit_now=True)
+            request = txn.create_request(
+                query=query, vars=vars_, mutations=mutations, commit_now=True
+            )
             txn.do_request(request)
         except Exception as exc:  # noqa: BLE001
             raise DgraphConnectionError(f"Dgraph upsert failed: {exc}") from exc
@@ -279,14 +298,28 @@ class DgraphClient:
             insert_always=set_json,
         )
 
-    def _count_uses(self) -> int:
-        """Count nodes that have outgoing uses edges."""
-        res = self._query(Q_COUNT_USES, {})
-        blocks = res.get("q") or []
-        return int(blocks[0].get("count") or 0) if blocks else 0
-
     def _count_decisions(self) -> int:
-        """Count Decision-like nodes by content predicate."""
+        """Count Decision nodes."""
         res = self._query(Q_COUNT_DECISIONS, {})
         blocks = res.get("q") or []
         return int(blocks[0].get("count") or 0) if blocks else 0
+
+
+def _safe_blank(key: str) -> str:
+    """Make a blank-node label safe for DQL."""
+    return "".join(ch if ch.isalnum() else "_" for ch in key)[:80]
+
+
+def _count_live_edges(nodes: list[dict[str, Any]]) -> int:
+    """Count edges whose both endpoints appear in the live node set."""
+    live = {str(n.get("uid")) for n in nodes}
+    seen: set[tuple[str, str]] = set()
+    for node in nodes:
+        src = str(node.get("uid"))
+        for pred in ("uses", "defined_by", "contains"):
+            for target in node.get(pred) or []:
+                dst = str(target.get("uid"))
+                if dst in live:
+                    key = (src, dst) if src <= dst else (dst, src)
+                    seen.add(key)
+    return len(seen)

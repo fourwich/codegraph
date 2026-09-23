@@ -101,3 +101,46 @@ def test_why_dgraph_backend_flag_parsed() -> None:
     )
     assert result.exit_code == 2
     assert "Invalid argument" in result.stdout
+
+
+def test_graph_dgraph_backend_connection_failure() -> None:
+    """graph --backend dgraph should exit 3 when Dgraph is down."""
+    result = runner.invoke(
+        app,
+        ["graph", "--at", "2026-09-23", "--scope", "src", "--backend", "dgraph"],
+        env={"DGRAPH_ALPHA": "localhost:59999"},
+    )
+    assert result.exit_code == 3
+    assert "Dgraph connection failed" in result.stdout
+
+
+def test_conflicts_dgraph_backend_connection_failure() -> None:
+    """conflicts --backend dgraph should exit 3 when Dgraph is down."""
+    result = runner.invoke(
+        app,
+        ["conflicts", "--scope", "src", "--backend", "dgraph"],
+        env={"DGRAPH_ALPHA": "localhost:59999"},
+    )
+    assert result.exit_code == 3
+    assert "Dgraph connection failed" in result.stdout
+
+
+def test_export_for_ai_writes_pack(tmp_path: Path) -> None:
+    """export --for-ai should write a context markdown pack."""
+    out = tmp_path / "context.md"
+    result = runner.invoke(
+        app,
+        ["export", "--for-ai", "--scope", "src", "--output", str(out)],
+    )
+    assert result.exit_code == 0
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert "CodeGraph Context Pack" in text
+    assert "Paste this into Cursor" in text
+
+
+def test_export_requires_for_ai() -> None:
+    """export without --for-ai should fail with invalid argument."""
+    result = runner.invoke(app, ["export", "--scope", "src"])
+    assert result.exit_code == 2
+    assert "Invalid argument" in result.stdout

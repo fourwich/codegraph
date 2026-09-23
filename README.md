@@ -6,6 +6,8 @@
 
 **Status:** alpha MVP · CLI usable · Dgraph backend optional / in progress
 
+See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
+
 - GitHub: https://github.com/fourwich/codegraph
 - Live demo: https://fourwich.github.io/codegraph
 
@@ -30,6 +32,8 @@ codegraph index .
 codegraph why src/auth/session.ts:42
 codegraph graph --at 2024-11-02 --scope src
 codegraph decisions --file src/auth/session.ts --timeline
+codegraph conflicts --scope src
+codegraph export --for-ai --scope src
 ```
 
 ## Tests
@@ -45,11 +49,21 @@ pytest --cov=src/codegraph
 SQLite remains the default. Dgraph is optional for multi-hop graph queries.
 
 ```bash
+# 1) Start Dgraph (requires Docker)
 docker compose up -d
+
+# 2) Index with Dgraph
 .venv\Scripts\codegraph.exe index . --backend dgraph
+
+# 3) Same commands accept --backend dgraph
 .venv\Scripts\codegraph.exe why src/auth/session.ts:42 --backend dgraph
 .venv\Scripts\codegraph.exe graph --at 2024-11-02 --backend dgraph
+.venv\Scripts\codegraph.exe conflicts --scope src --backend dgraph
+.venv\Scripts\codegraph.exe export --for-ai --scope src --backend dgraph
 ```
+
+Dgraph UI: http://localhost:8080/?latest  
+If Dgraph is down, `--backend dgraph` exits with code `3`. SQLite mode is unchanged.
 
 See `.env.example` for `DGRAPH_ALPHA`. If Dgraph is down, `--backend dgraph` exits with code `3`.
 
