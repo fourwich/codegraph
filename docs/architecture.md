@@ -74,21 +74,24 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 
 ## Status (as of submission)
 
+Numbers below match a local run of `pytest -q` and `codegraph --help` on the same commit.
+
 | Status | Item |
 |---|---|
 | ✅ Done | Product site (HTML / CSS / JS) |
-| ✅ Done | CLI with 6 commands |
+| ✅ Done | CLI with 7 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`) |
 | ✅ Done | tree-sitter parsing for TypeScript, Python, Java, Go, Rust, C++ |
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 48 tests passing |
-| ✅ Done | Local web visualization (Cytoscape.js) |
-| ✅ Done | VSCode extension (source + vsix) |
-| ✅ Done | Optional LLM extraction (Ollama, graceful fallback) |
-| 🚧 In progress | Dgraph backend (client ready; live cluster optional) |
-| ⬜ Planned | Deeper multi-hop Dgraph queries |
+| ✅ Done | 49 tests passing (`pytest -q`) |
+| ✅ Done | Local web visualization (`codegraph serve`) |
+| ✅ Done | VSCode extension sources + `why --json` |
+| ✅ Done | Optional Ollama LLM extraction hook (`--use-llm`) |
+| 🚧 In progress | Dgraph backend (client + `--backend dgraph` implemented; live cluster optional) |
+| ⬜ Planned | Dgraph multi-hop query hardening |
+| ⬜ Planned | VS Code Marketplace publish |
 
 ---
 
@@ -96,12 +99,11 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 
 | Version | Scope |
 |---|---|
-| v0.1.0 | CLI + SQLite + real Git history + decision extraction (current) |
-| v0.2.0 | Multi-language parsers + time-travel queries |
-| v0.3.0 | Web visualization + export / conflicts |
-| v0.4.0 | Dgraph backend hardening |
-| v0.5.0 | LLM-based decision extraction (local-first, Ollama) |
-| v0.6.0 | VSCode extension marketplace publish |
+| v0.1.0 | Stabilize CLI + SQLite + tests |
+| v0.2.0 | Dgraph production hardening |
+| v0.3.0 | Richer conflict rules |
+| v0.4.0 | Marketplace release for VSCode extension |
+| v0.5.0 | Larger-repo performance tuning |
 
 ---
 

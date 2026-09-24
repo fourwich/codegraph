@@ -1,10 +1,14 @@
 # CodeGraph
 
+![tests](https://img.shields.io/badge/tests-49%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha MVP · CLI usable · Dgraph backend optional / in progress
+**Status:** alpha · 7 CLI commands · 6 languages · SQLite default · optional Dgraph
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -13,18 +17,31 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 
 ## Status
 
+Verified with `pytest -q` and `codegraph --help` (49 tests passing).
+
 - [x] Product site (HTML / CSS / JS)
-- [x] CLI with 6 commands
-- [x] tree-sitter parsing (TS / Python / Java / Go / Rust / C++)
+- [x] CLI with 7 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
+- [x] tree-sitter parsing (6 languages)
 - [x] SQLite storage
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG
 - [x] Real time-travel queries (`graph --at`)
-- [x] 48+ tests passing
+- [x] 49 tests passing
 - [x] Local web visualization (`codegraph serve`)
-- [x] VSCode extension + `--json` output
-- [ ] Dgraph backend (in progress / optional)
-- [x] LLM extraction hook (Ollama, optional)
+- [x] VSCode extension sources + `why --json`
+- [x] Optional Ollama hook (`--use-llm`)
+- [ ] Dgraph backend (client + flag done; live cluster optional)
+
+## Language support
+
+| Language | Extensions | Parser |
+|---|---|---|
+| TypeScript | `.ts` `.tsx` | `treesitter_ts.py` |
+| Python | `.py` | `treesitter_py.py` |
+| Java | `.java` | `treesitter_java.py` |
+| Go | `.go` | `treesitter_go.py` |
+| Rust | `.rs` | `treesitter_rust.py` |
+| C++ | `.cpp` `.cc` `.cxx` `.hpp` `.hh` `.hxx` `.h` | `treesitter_cpp.py` |
 
 ## Quick start
 
@@ -39,17 +56,32 @@ python -m venv .venv
 # source .venv/bin/activate && pip install -e ".[dev]"  # macOS/Linux
 ```
 
-## Commands
+## Commands (7)
 
 ```bash
 codegraph --help
-codegraph index .
-codegraph why src/auth/session.ts:42
+codegraph index . [--depth N] [--backend sqlite|dgraph] [--use-llm] [--json]
+codegraph why src/auth/session.ts:42 [--json]
 codegraph graph --at 2024-11-02 --scope src
 codegraph decisions --file src/auth/session.ts --timeline
 codegraph conflicts --scope src
 codegraph export --for-ai --scope src
+codegraph serve --port 8080
 ```
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| CLI | Python · Typer · Rich |
+| Models | pydantic |
+| Parsing | tree-sitter (+ language grammars) |
+| Git | GitPython |
+| Storage | SQLite (default) · Dgraph (optional) |
+| Web | FastAPI · Uvicorn · Cytoscape.js |
+| LLM (optional) | Ollama via httpx |
+| Editor | VSCode extension (TypeScript) |
+| Tests | pytest |
 
 ## Tests
 
