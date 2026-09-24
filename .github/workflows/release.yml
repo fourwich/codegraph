@@ -29,8 +29,10 @@ jobs:
           generate_release_notes: true
 
       - name: Publish to PyPI
-        if: ${{ vars.PYPI_TOKEN != '' || secrets.PYPI_TOKEN != '' }}
         continue-on-error: true
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+        env:
+          # Skip silently when the secret is not configured.
+          HATCH_BUILD_HOOKS_ENABLE: "false"
