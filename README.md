@@ -11,6 +11,20 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 - GitHub: https://github.com/fourwich/codegraph
 - Live demo: https://fourwich.github.io/codegraph
 
+## Status
+
+- [x] Product site (HTML / CSS / JS)
+- [x] CLI with 6 commands
+- [x] tree-sitter parsing for TypeScript and Python
+- [x] SQLite storage
+- [x] Real Git history traversal
+- [x] Decision extraction from commits, ADRs, CHANGELOG
+- [x] Real time-travel queries (`graph --at`)
+- [x] 25 tests passing
+- [ ] Dgraph backend (in progress)
+- [ ] Web visualization (Cytoscape.js) (planned)
+- [ ] VSCode extension (planned)
+
 ## Quick start
 
 ```bash

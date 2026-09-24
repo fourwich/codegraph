@@ -1,49 +1,54 @@
 # CodeGraph — Architecture Overview
 
-Git blame tells you who changed it. CodeGraph tells you why.
+**Git blame tells you who changed it. CodeGraph tells you why.**
+
+---
 
 ## Problem
 
-Developers constantly ask "why is this code written this way?"
-git blame shows authorship. GitHub search shows text matches.
-ADR tools require manual writing. AI coding assistants see only
-the current file. No existing tool connects a line of code to
-the design decisions that shaped it.
+Developers constantly ask "why is this code written this way?" git blame shows
+authorship. GitHub search shows text matches. ADR tools require manual writing.
+AI coding assistants see only the current file. No existing tool connects a line
+of code to the design decisions that shaped it.
+
+---
 
 ## Solution — three layers, one graph
 
-1. **Structure:** tree-sitter parses TypeScript/Python into AST nodes and edges (uses / defined_by / contains)
-2. **Time:** Every node carries valid_from / valid_to, derived from real Git history
-3. **Decisions:** Extracted from commit messages, ADRs, and CHANGELOG, linked to the exact code lines they justify
+1. **Structure** — tree-sitter parses TypeScript/Python into AST nodes and edges (`uses` / `defined_by` / `contains`)
+2. **Time** — Every node carries `valid_from` / `valid_to`, derived from real Git history
+3. **Decisions** — Extracted from commit messages, ADRs, and CHANGELOG, linked to the exact code lines they justify
+
+---
 
 ## Architecture
 
-```text
-Source files (.ts/.py)  ->  tree-sitter parsers  ->  CodeNode + Edge
-                                                          |
-Git history (all commits)  ->  GitHistory  ->  SQLite / Dgraph
-                                                          |
-Commit msgs / ADRs / CHANGELOG  ->  Decision extractor
-                                                          |
-                                    CLI: index / why / graph / ...
-                                                          |
-                          Terminal card + Web viz + AI context pack
 ```
+Source files (.ts / .py)  ──▶  tree-sitter parsers  ──▶  CodeNode + Edge
+                                                              │
+Git history (all commits) ──▶  GitHistory          ──▶  SQLite / Dgraph
+                                                              │
+Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
+                                                              │
+                                          CLI: index / why / graph / …
+                                                              │
+                            Terminal card + Web viz + AI context pack
+```
+
+---
 
 ## Data model
 
-```text
-CodeNode: uid, kind, name, file_path, line_start, line_end,
-          language, valid_from, valid_to, parent_uid
-Edge: from_uid, to_uid, kind (uses / defined_by / contains)
-Decision: content, reason, alternatives, status, source,
-          source_ref, timestamp, author, constraints, confidence
-```
+- **CodeNode** — `uid, kind, name, file_path, line_start, line_end, language, valid_from, valid_to, parent_uid`
+- **Edge** — `from_uid, to_uid, kind` (`uses` / `defined_by` / `contains`)
+- **Decision** — `content, reason, alternatives, status, source, source_ref, timestamp, author, constraints, confidence`
+
+---
 
 ## Seven commands
 
 | Command | Purpose |
-| --- | --- |
+|---|---|
 | `codegraph index <path>` | Parse + ingest Git history + store |
 | `codegraph why <file>:<line>` | Decision card for that line |
 | `codegraph graph --at <date>` | Code graph at a past moment |
@@ -52,37 +57,43 @@ Decision: content, reason, alternatives, status, source,
 | `codegraph export --for-ai` | Export AI agent context |
 | `codegraph serve` | Local web visualization |
 
+---
+
 ## Tech choices
 
-| Tool | Why |
-| --- | --- |
-| tree-sitter | Multi-language parsing, incremental, industry standard |
-| GitPython | Read-only access to real Git history |
-| Dgraph | Native graph queries for multi-hop decision tracing |
-| Typer + Rich | Fast CLI, readable terminal output |
-| pydantic | Typed data models |
-| SQLite | Default backend; zero-config, local-first |
+| Layer | Choice | Reason |
+|---|---|---|
+| Parsing | tree-sitter | Multi-language, incremental, industry standard |
+| Git | GitPython | Read-only access to real Git history |
+| Graph DB | Dgraph | Native graph queries for multi-hop decision tracing |
+| CLI | Typer + Rich | Fast CLI, readable terminal output |
+| Models | pydantic | Typed data models |
+| Storage | SQLite | Default backend; zero-config, local-first |
+
+---
 
 ## Status (as of submission)
 
 | Status | Item |
-| --- | --- |
-| Done | Product site (HTML/CSS/JS) |
-| Done | CLI with 6 commands |
-| Done | tree-sitter parsing for TypeScript and Python |
-| Done | SQLite storage |
-| Done | Real Git history traversal |
-| Done | Decision extraction from commits, ADRs, CHANGELOG |
-| Done | Real time-travel queries (graph --at) |
-| Done | 25 tests passing |
-| In progress | Dgraph backend |
-| Planned | Web visualization (Cytoscape.js) |
-| Planned | VSCode extension |
+|---|---|
+| ✅ Done | Product site (HTML / CSS / JS) |
+| ✅ Done | CLI with 6 commands |
+| ✅ Done | tree-sitter parsing for TypeScript and Python |
+| ✅ Done | SQLite storage |
+| ✅ Done | Real Git history traversal |
+| ✅ Done | Decision extraction from commits, ADRs, CHANGELOG |
+| ✅ Done | Real time-travel queries (`graph --at`) |
+| ✅ Done | 25 tests passing |
+| 🚧 In progress | Dgraph backend |
+| ⬜ Planned | Web visualization (Cytoscape.js) |
+| ⬜ Planned | VSCode extension |
+
+---
 
 ## Roadmap
 
-| Version | Focus |
-| --- | --- |
+| Version | Scope |
+|---|---|
 | v0.1.0 | CLI + SQLite (current) |
 | v0.2.0 | Real Git history + decision extraction |
 | v0.3.0 | Dgraph backend + time-travel queries |
@@ -92,4 +103,5 @@ Decision: content, reason, alternatives, status, source,
 
 ---
 
-Built by a 15-year-old self-taught developer. MIT License. https://github.com/fourwich/codegraph
+Built by a 15-year-old self-taught developer.
+MIT License. https://github.com/fourwich/codegraph
