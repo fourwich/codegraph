@@ -60,6 +60,8 @@ def _empty_stats() -> dict[str, int]:
 
 
 def _node_json(node: Any) -> dict[str, Any]:
+    valid_from = getattr(node, "valid_from", None)
+    valid_to = getattr(node, "valid_to", None)
     return {
         "uid": node.uid,
         "kind": node.kind,
@@ -69,10 +71,8 @@ def _node_json(node: Any) -> dict[str, Any]:
         "line_end": node.line_end,
         "language": node.language,
         "commit_sha": getattr(node, "commit_sha", ""),
-        "valid_from": getattr(node, "valid_from", None).isoformat()
-        if getattr(node, "valid_from", None)
-        else None,
-        "valid_to": node.valid_to.isoformat() if getattr(node, "valid_to", None) else None,
+        "valid_from": valid_from.isoformat() if valid_from else None,
+        "valid_to": valid_to.isoformat() if valid_to else None,
     }
 
 

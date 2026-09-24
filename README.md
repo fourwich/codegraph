@@ -1,6 +1,7 @@
 # CodeGraph
 
 ![tests](https://img.shields.io/badge/tests-49%20passing-brightgreen)
+![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 

@@ -10,9 +10,12 @@ from codegraph.decisions.extractor import (
     extract_decisions_from_text,
     looks_like_decision,
     parse_adr_markdown,
-    split_sentences,
 )
-from codegraph.decisions.sources import extract_from_adrs, extract_from_changelog, extract_from_commits
+from codegraph.decisions.sources import (
+    extract_from_adrs,
+    extract_from_changelog,
+    extract_from_commits,
+)
 from codegraph.models import DecisionSource
 
 TS = datetime(2026, 9, 23, tzinfo=timezone.utc)
@@ -44,7 +47,10 @@ def test_extract_decisions_from_commit_message() -> None:
 
 def test_parse_adr_sections() -> None:
     """ADR markdown should split into status/decision/context."""
-    md = "# ADR-001\n\n## Status\nAccepted\n\n## Context\nNeed storage.\n\n## Decision\nUse SQLite because it is embedded.\n"
+    md = (
+        "# ADR-001\n\n## Status\nAccepted\n\n## Context\nNeed storage.\n\n"
+        "## Decision\nUse SQLite because it is embedded.\n"
+    )
     sections = parse_adr_markdown(md)
     assert "sqlite" in (sections.get("decision") or "").lower()
     assert "accepted" in (sections.get("status") or "").lower()

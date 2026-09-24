@@ -6,9 +6,8 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from tree_sitter import Language, Node, Parser
-
 import tree_sitter_python as tspython
+from tree_sitter import Language, Node, Parser
 
 from codegraph.models import CodeNode, make_uid, normalize_location_path
 from codegraph.parser.base import BaseParser

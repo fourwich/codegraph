@@ -17,7 +17,6 @@ from codegraph.models import (
     CodeNode,
     Decision,
     Edge,
-    make_uid,
     normalize_location_path,
 )
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
@@ -78,7 +77,6 @@ def is_skipped_path(root: Path, file_path: str) -> bool:
 
 def parse_source_text(path_str: str, text: str) -> tuple[list[CodeNode], list[Edge]]:
     """Parse in-memory source text into nodes and edges."""
-    tmp_suffix = Path(path_str).suffix or ".txt"
     parser = get_parser_for_path(Path(path_str))
     if parser is None:
         return [], []
@@ -123,7 +121,9 @@ def ingest_commit(
         if parser is None:
             continue
         try:
-            nodes = parser.parse_text(rel_n, text, commit_sha=commit.sha, valid_from=commit.timestamp)
+            nodes = parser.parse_text(
+                rel_n, text, commit_sha=commit.sha, valid_from=commit.timestamp
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Parse failed at %s %s: %s", commit.sha[:10], rel_n, exc)
             continue

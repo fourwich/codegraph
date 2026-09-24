@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 
 from codegraph.models import CodeNode, Edge
@@ -27,6 +28,26 @@ class BaseParser(ABC):
         Returns:
             Extracted code nodes; empty list when parsing fails.
         """
+
+    def parse_text(
+        self,
+        rel_path: str,
+        source: str,
+        commit_sha: str = "",
+        valid_from: datetime | None = None,
+    ) -> list[CodeNode]:
+        """Parse source text (default: subclasses override).
+
+        Args:
+            rel_path: Repository-relative path.
+            source: File contents.
+            commit_sha: Optional commit stamp.
+            valid_from: Optional validity start.
+
+        Returns:
+            Extracted code nodes.
+        """
+        raise NotImplementedError
 
     def extract_edges(self, nodes: list[CodeNode]) -> list[Edge]:
         """Derive relationship edges from hierarchy and call records.

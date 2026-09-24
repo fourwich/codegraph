@@ -15,7 +15,8 @@ from codegraph.commands.why import decisions_command, why_command
 app = typer.Typer(
     name="codegraph",
     help=(
-        "CodeGraph: turn code structure, history, and design decisions into one queryable graph.\n\n"
+        "CodeGraph: turn code structure, history, and design decisions into one "
+        "queryable graph.\n\n"
         "MVP stage ships a full command flow on bundled sample data and local graph stores."
     ),
     add_completion=True,

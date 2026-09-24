@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,9 @@ class GitHistory:
         """Return the repository working tree root."""
         return Path(self._repo.working_dir)
 
-    def iter_commits(self, since: str | None = None, depth: int | None = None) -> Iterator[CommitInfo]:
+    def iter_commits(
+        self, since: str | None = None, depth: int | None = None
+    ) -> Iterator[CommitInfo]:
         """Yield commits from newest to oldest.
 
         Args:
@@ -125,8 +127,8 @@ class GitHistory:
             return []
         paths: list[str] = []
         for blob in tree.traverse():
-            if blob.type == "blob":
-                paths.append(blob.path)
+            if getattr(blob, "type", None) == "blob":
+                paths.append(str(getattr(blob, "path", "")))
         return paths
 
     def _to_info(self, commit) -> CommitInfo:

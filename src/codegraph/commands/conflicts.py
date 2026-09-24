@@ -37,7 +37,12 @@ def reasons_conflict(a: Decision, b: Decision) -> str | None:
     for left, right in OPPOSITE_PAIRS:
         if (left in wa and right in wb) or (right in wa and left in wb):
             return f"opposite terms '{left}' vs '{right}'"
-    if a.uid != b.uid and "supersede" in b.reason.lower() and a.status == DecisionStatus.ACCEPTED and b.status == DecisionStatus.ACCEPTED:
+    if (
+        a.uid != b.uid
+        and "supersede" in b.reason.lower()
+        and a.status == DecisionStatus.ACCEPTED
+        and b.status == DecisionStatus.ACCEPTED
+    ):
         return "claimed supersede but both still accepted"
     return None
 
@@ -73,8 +78,8 @@ def find_conflicts(decisions: list[Decision], scope: str) -> list[tuple[Decision
 def load_decisions(backend: str) -> list[Decision]:
     """Load decisions from SQLite or Dgraph."""
     if backend == "dgraph":
-        from codegraph.graph import DgraphClient, DgraphConnectionError
         from codegraph.commands.why import decision_from_dgraph
+        from codegraph.graph import DgraphClient, DgraphConnectionError
 
         try:
             client = DgraphClient()

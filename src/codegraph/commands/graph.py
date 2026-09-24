@@ -12,12 +12,8 @@ from rich.table import Table
 from codegraph.models import SAMPLE_DECISIONS, CodeNode, Decision
 from codegraph.storage import (
     connect,
-    count_decisions,
-    count_edges,
     count_edges_at,
-    count_nodes,
     db_path_for_root,
-    query_decisions_for_file,
     query_nodes_at,
 )
 
@@ -124,7 +120,11 @@ def build_graph_table(
     table.add_column("Metric", style="cyan", no_wrap=True)
     table.add_column("Value", style="white")
     table.add_column("Notes", style="dim")
-    table.add_row("Date", at.isoformat(), "valid_from <= date AND (valid_to is null OR valid_to >= date)")
+    table.add_row(
+        "Date",
+        at.isoformat(),
+        "valid_from <= date AND (valid_to is null OR valid_to >= date)",
+    )
     table.add_row("Nodes", str(node_count), "CodeNode versions valid at date")
     table.add_row("Edges", str(edge_count), "edges with both endpoints valid at date")
     table.add_row("Decisions", str(decision_count), "Decision (not after this date)")

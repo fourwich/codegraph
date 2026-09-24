@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import tree_sitter_java as tsjava
-from tree_sitter import Language, Node, Parser
+from tree_sitter import Language, Parser
 
 from codegraph.models import CodeNode
 from codegraph.parser.base import BaseParser
