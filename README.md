@@ -136,6 +136,10 @@ index.html        # product site
 - Competition copy: `docs/competition_submission.md`
 - Contributing: `CONTRIBUTING.md`
 
+## Development notes
+
+Built with AI coding assistants for API discovery, debugging, and documentation. Architecture, design decisions, and final code review are my own.
+
 ## License
 
 MIT
