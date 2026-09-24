@@ -136,7 +136,7 @@ def test_export_for_ai_writes_pack(tmp_path: Path) -> None:
     assert out.exists()
     text = out.read_text(encoding="utf-8")
     assert "CodeGraph Context Pack" in text
-    assert "Paste this into Cursor" in text
+    assert "Paste this into your coding assistant" in text
 
 
 def test_export_requires_for_ai() -> None:

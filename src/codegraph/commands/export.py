@@ -103,7 +103,7 @@ def build_context_markdown(nodes: list, decisions: list[Decision], scope: str) -
                 lines.append("Related decisions: (none indexed)")
             lines.append("")
     lines.append(
-        "Paste this into Cursor/Claude/Copilot before editing these files."
+        "Paste this into your coding assistant before editing these files."
     )
     lines.append("")
     return "\n".join(lines)
@@ -174,7 +174,7 @@ def export_command(
     console.print(f"[bold green]Context pack written[/] {output}")
     console.print(f"  · CodeNodes: [bold]{len(nodes)}[/]")
     console.print(f"  · Decisions: [bold]{len(decisions)}[/]")
-    console.print("[dim]Paste this into Cursor/Claude/Copilot before editing these files.[/]")
+    console.print("[dim]Paste this into your coding assistant before editing these files.[/]")
 
 
 app = typer.Typer(help="Export an AI-agent context pack")
