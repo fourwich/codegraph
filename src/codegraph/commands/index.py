@@ -183,12 +183,14 @@ def load_decisions(
 
 
 def _ingest_working_tree(
-    root: Path, all_nodes: list[CodeNode], all_edges: list[Edge]
+    root: Path, all_nodes: list[CodeNode], all_edges: list[Edge], jobs: int = 0
 ) -> None:
     """Parse files currently on disk when Git history is unavailable."""
+    from codegraph.parser.parallel import parse_files_parallel
     from codegraph.parser.registry import is_supported_source
 
     now = datetime.now(timezone.utc)
+    items: list[tuple[str, str]] = []
     for path in sorted(root.rglob("*")):
         if not path.is_file() or not is_supported_source(path):
             continue
@@ -201,15 +203,13 @@ def _ingest_working_tree(
         except (OSError, UnicodeDecodeError) as exc:
             logger.warning("Read failed %s: %s", path, exc)
             continue
-        parser = get_parser_for_path(Path(rel))
-        if parser is None:
-            continue
-        try:
-            nodes = parser.parse_text(rel, text, commit_sha="WORKTREE", valid_from=now)
-            all_nodes.extend(nodes)
-            all_edges.extend(parser.extract_edges(nodes))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Parse failed %s: %s", rel, exc)
+        items.append((rel, text))
+
+    nodes, edges = parse_files_parallel(
+        items, commit_sha="WORKTREE", valid_from=now, jobs=jobs
+    )
+    all_nodes.extend(nodes)
+    all_edges.extend(edges)
 
 
 def write_sqlite_graph(
@@ -279,6 +279,17 @@ def index_command(
         "--json",
         help="Emit machine-readable JSON summary",
     ),
+    jobs: int = typer.Option(
+        0,
+        "--jobs",
+        help="Parallel parse workers (0 = CPU-1)",
+        metavar="N",
+    ),
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help="Force full rebuild (ignore incremental state)",
+    ),
 ) -> None:
     """Parse Git history with tree-sitter and persist the code graph.
 
@@ -318,16 +329,30 @@ def index_command(
         history = None
 
     if history is not None:
-        commits = list(history.iter_commits(depth=depth))
-        for commit in reversed(commits):
+        from codegraph.git.incremental import commits_after, save_last_head
+
+        if full:
+            commits = list(history.iter_commits(depth=depth))
+            pending = list(reversed(commits))
+        else:
+            pending = commits_after(root, history, depth=depth)
+        for commit in pending:
             try:
                 ingest_commit(history, commit, live, all_nodes, all_edges)
                 commit_count += 1
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skip commit %s: %s", commit.sha, exc)
+        try:
+            head = next(history.iter_commits(depth=1), None)
+            if head is not None:
+                save_last_head(root, head.sha)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Cannot save incremental state: %s", exc)
 
-    if not all_nodes:
-        _ingest_working_tree(root, all_nodes, all_edges)
+    if not all_nodes and full:
+        _ingest_working_tree(root, all_nodes, all_edges, jobs=jobs)
+    elif not all_nodes:
+        _ingest_working_tree(root, all_nodes, all_edges, jobs=jobs)
 
     if use_llm:
         console.print(

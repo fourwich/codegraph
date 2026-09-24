@@ -15,15 +15,16 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 6 commands
-- [x] tree-sitter parsing for TypeScript and Python
+- [x] tree-sitter parsing (TS / Python / Java / Go / Rust / C++)
 - [x] SQLite storage
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG
 - [x] Real time-travel queries (`graph --at`)
-- [x] 25 tests passing
-- [ ] Dgraph backend (in progress)
-- [ ] Web visualization (Cytoscape.js) (planned)
-- [ ] VSCode extension (planned)
+- [x] 48+ tests passing
+- [x] Local web visualization (`codegraph serve`)
+- [x] VSCode extension + `--json` output
+- [ ] Dgraph backend (in progress / optional)
+- [x] LLM extraction hook (Ollama, optional)
 
 ## Quick start
 

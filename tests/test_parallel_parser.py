@@ -1,16 +1,25 @@
-"""Tests for working-tree ingest helpers."""
+"""Tests for parallel working-tree parsing."""
 
 from __future__ import annotations
 
-from pathlib import Path
+from datetime import datetime, timezone
 
-from codegraph.commands.index import _ingest_working_tree
+from codegraph.parser.parallel import parse_files_parallel
 
 
-def test_ingest_working_tree(tmp_path: Path) -> None:
-    """Working-tree ingest collects Python nodes."""
-    (tmp_path / "a.py").write_text("def f():\n    return 1\n", encoding="utf-8")
-    nodes: list = []
-    edges: list = []
-    _ingest_working_tree(tmp_path, nodes, edges)
-    assert any(n.name == "f" for n in nodes)
+def test_parse_files_parallel_single_worker() -> None:
+    """Single-worker path still returns nodes and edges."""
+    items = [
+        ("a.py", "def f():\n    return 1\n"),
+        ("b.py", "def g():\n    return f()\n"),
+    ]
+    nodes, edges = parse_files_parallel(
+        items,
+        commit_sha="abc",
+        valid_from=datetime.now(timezone.utc),
+        jobs=1,
+    )
+    names = {n.name for n in nodes}
+    assert "f" in names
+    assert "g" in names
+    assert any(e.kind in {"uses", "contains", "defined_by"} for e in edges)

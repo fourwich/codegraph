@@ -78,15 +78,17 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 |---|---|
 | ✅ Done | Product site (HTML / CSS / JS) |
 | ✅ Done | CLI with 6 commands |
-| ✅ Done | tree-sitter parsing for TypeScript and Python |
+| ✅ Done | tree-sitter parsing for TypeScript, Python, Java, Go, Rust, C++ |
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 25 tests passing |
-| 🚧 In progress | Dgraph backend |
-| ⬜ Planned | Web visualization (Cytoscape.js) |
-| ⬜ Planned | VSCode extension |
+| ✅ Done | 48 tests passing |
+| ✅ Done | Local web visualization (Cytoscape.js) |
+| ✅ Done | VSCode extension (source + vsix) |
+| ✅ Done | Optional LLM extraction (Ollama, graceful fallback) |
+| 🚧 In progress | Dgraph backend (client ready; live cluster optional) |
+| ⬜ Planned | Deeper multi-hop Dgraph queries |
 
 ---
 
@@ -94,12 +96,12 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 
 | Version | Scope |
 |---|---|
-| v0.1.0 | CLI + SQLite (current) |
-| v0.2.0 | Real Git history + decision extraction |
-| v0.3.0 | Dgraph backend + time-travel queries |
-| v0.4.0 | Web visualization |
+| v0.1.0 | CLI + SQLite + real Git history + decision extraction (current) |
+| v0.2.0 | Multi-language parsers + time-travel queries |
+| v0.3.0 | Web visualization + export / conflicts |
+| v0.4.0 | Dgraph backend hardening |
 | v0.5.0 | LLM-based decision extraction (local-first, Ollama) |
-| v0.6.0 | VSCode extension |
+| v0.6.0 | VSCode extension marketplace publish |
 
 ---
 
