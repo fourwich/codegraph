@@ -221,14 +221,16 @@ def create_app() -> FastAPI:
 
 
 def _parse_date(raw: str) -> datetime:
-    """Parse YYYY-MM-DD or default to now."""
+    """Parse YYYY-MM-DD or default to now (end-of-day inclusive)."""
     value = (raw or "").strip()
     if not value:
         return datetime.now(timezone.utc)
     try:
-        return datetime.strptime(value, "%Y-%m-%d")
+        day = datetime.strptime(value, "%Y-%m-%d")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid date: {raw}") from exc
+    # Use end-of-day so nodes stamped later the same day are included.
+    return day.replace(hour=23, minute=59, second=59)
 
 
 def _timeline_sqlite(scope: str) -> list[str]:

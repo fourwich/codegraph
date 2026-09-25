@@ -2,11 +2,15 @@
 (function () {
   "use strict";
 
+  // Always call the origin that served this page (works for any port/host).
+  const API_BASE = window.location.origin || "";
+
   const state = {
     nodes: [],
     decisions: [],
     ticks: [],
     backend: "sqlite",
+    stats: null,
   };
 
   let cy = null;
@@ -15,6 +19,20 @@
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function apiUrl(path, params) {
+    const qs = new URLSearchParams(params || {}).toString();
+    return API_BASE + path + (qs ? "?" + qs : "");
+  }
+
+  async function fetchJson(path, params) {
+    const url = apiUrl(path, params);
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status + " for " + path);
+    }
+    return res.json();
   }
 
   function selectedKinds() {
@@ -157,9 +175,11 @@
   async function loadGraph() {
     const at = currentDate();
     const scope = $("scope").value || ".";
-    const url = "/api/graph?at=" + encodeURIComponent(at) + "&scope=" + encodeURIComponent(scope) + "&backend=" + state.backend;
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await fetchJson("/api/graph", {
+      at: at,
+      scope: scope,
+      backend: state.backend,
+    });
     state.nodes = data.nodes || [];
     state.decisions = data.decisions || [];
     state.stats = data.stats || {};
@@ -187,9 +207,11 @@
   }
 
   async function loadWhy(file, line) {
-    const url = "/api/why?file=" + encodeURIComponent(file) + "&line=" + encodeURIComponent(line) + "&backend=" + state.backend;
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await fetchJson("/api/why", {
+      file: file,
+      line: line,
+      backend: state.backend,
+    });
     const body = $("detail-body");
     let html = body.innerHTML;
     (data.decisions || []).slice(0, 3).forEach((d) => {
@@ -228,8 +250,7 @@
   }
 
   async function init() {
-    const res = await fetch("/api/timeline?scope=src");
-    const data = await res.json();
+    const data = await fetchJson("/api/timeline", { scope: "src" });
     state.ticks = data.ticks && data.ticks.length ? data.ticks : [""];
     $("time").max = String(Math.max(0, state.ticks.length - 1));
     $("time").value = String(state.ticks.length - 1);
@@ -256,6 +277,8 @@
   }
 
   init().catch((err) => {
-    $("detail-body").textContent = "Failed to load graph: " + err;
+    $("detail-body").textContent =
+      "Failed to load graph: " + err +
+      " — run `codegraph serve` and open the URL it prints (not file://).";
   });
 })();
