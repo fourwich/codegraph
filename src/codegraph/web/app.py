@@ -15,6 +15,7 @@ from codegraph.storage import (
     connect,
     count_edges_at,
     db_path_for_root,
+    list_edges_at,
     query_all_decisions,
     query_decisions_for_file,
     query_decisions_for_line,
@@ -37,13 +38,24 @@ def _load_graph_sqlite(at: datetime, scope: str) -> dict[str, Any]:
     try:
         nodes = query_nodes_at(conn, at, scope)
         edge_count = count_edges_at(conn, at, scope)
-        decisions = [d for d in query_all_decisions(conn) if d.timestamp.date() <= at.date()]
+        edges = list_edges_at(conn, at, scope, limit=400)
+        all_decisions = [
+            d for d in query_all_decisions(conn) if d.timestamp.date() <= at.date()
+        ]
         prefix = normalize_location_path(scope)
+        scoped = []
         if prefix and prefix != ".":
-            decisions = [d for d in decisions if (d.file_path or "").startswith(prefix)]
+            scoped = [
+                d
+                for d in all_decisions
+                if (d.file_path or "").startswith(prefix)
+                or prefix.startswith((d.file_path or "").rsplit("/", 1)[0] or "\0")
+            ]
+        # Keep the graph useful: if scope filter empties decisions, show top global ones.
+        decisions = scoped or all_decisions
         return {
             "nodes": [_node_json(n) for n in nodes],
-            "edges": [],
+            "edges": edges,
             "decisions": [_decision_json(d) for d in decisions[:50]],
             "stats": {
                 "nodes": len(nodes),

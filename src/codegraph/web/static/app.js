@@ -7,6 +7,7 @@
 
   const state = {
     nodes: [],
+    edges: [],
     decisions: [],
     ticks: [],
     backend: "sqlite",
@@ -61,10 +62,23 @@
     return state.decisions.filter((d) => st.has(d.status));
   }
 
+  const LAYOUT_OPTS = {
+    name: "cose",
+    animate: false,
+    nodeRepulsion: 8000,
+    idealEdgeLength: 80,
+    edgeElasticity: 100,
+    gravity: 0.3,
+    numIter: 500,
+    padding: 30,
+    randomize: false,
+  };
+
   function buildElements() {
     const nodes = filteredNodes().slice(0, 250);
     const decisions = filteredDecisions().slice(0, 40);
     const elements = [];
+    const live = new Set(nodes.map((n) => n.uid));
     nodes.forEach((n) => {
       const size = 28 + Math.min(28, (n.line_end - n.line_start) * 2);
       elements.push({
@@ -97,6 +111,21 @@
           confidence: d.confidence,
         },
         classes: "decision " + d.status,
+      });
+    });
+    // Draw live edges only (both endpoints present in the node set).
+    (state.edges || []).forEach((e, i) => {
+      const src = e.from_uid;
+      const dst = e.to_uid;
+      if (!live.has(src) || !live.has(dst)) return;
+      elements.push({
+        data: {
+          id: "e" + i + ":" + src + "->" + dst,
+          source: src,
+          target: dst,
+          kind: e.kind || "uses",
+        },
+        classes: "edge " + (e.kind || "uses"),
       });
     });
     return elements;
@@ -145,14 +174,40 @@
         {
           selector: "edge",
           style: {
-            width: 1,
+            width: 1.4,
             "line-color": "#2a3644",
             "curve-style": "bezier",
-            opacity: 0.8,
+            opacity: 0.85,
+            "target-arrow-shape": "triangle",
+            "arrow-scale": 0.7,
+          },
+        },
+        {
+          selector: "edge.uses",
+          style: {
+            "line-color": "#3dffc5",
+            "target-arrow-color": "#3dffc5",
+            opacity: 0.7,
+          },
+        },
+        {
+          selector: "edge.defined_by",
+          style: {
+            "line-color": "#6ba3ff",
+            "line-style": "dashed",
+            "target-arrow-color": "#6ba3ff",
+          },
+        },
+        {
+          selector: "edge.contains",
+          style: {
+            "line-color": "#7f8fa3",
+            "line-style": "dotted",
+            "target-arrow-color": "#7f8fa3",
           },
         },
       ],
-      layout: { name: "cose", animate: false, padding: 24 },
+      layout: LAYOUT_OPTS,
     });
     cy.on("tap", "node", (evt) => showDetail(evt.target.data()));
     cy.on("tap", (evt) => {
@@ -165,11 +220,12 @@
     ensureCy();
     cy.elements().remove();
     cy.add(buildElements());
-    cy.layout({ name: "cose", animate: false, padding: 24 }).run();
+    cy.layout(LAYOUT_OPTS).run();
     $("stats").textContent =
       "nodes " + filteredNodes().length +
+      " · edges " + (state.edges ? state.edges.length : 0) +
       " · decisions " + filteredDecisions().length +
-      " · " + (state.stats ? "edges " + state.stats.edges : "edges ?");
+      (state.stats ? " (live " + state.stats.edges + ")" : "");
   }
 
   async function loadGraph() {
@@ -181,6 +237,7 @@
       backend: state.backend,
     });
     state.nodes = data.nodes || [];
+    state.edges = data.edges || [];
     state.decisions = data.decisions || [];
     state.stats = data.stats || {};
     refreshGraph();
@@ -267,7 +324,7 @@
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "r" || e.key === "R") {
-        if (cy) cy.layout({ name: "cose", animate: false }).run();
+        if (cy) cy.layout(LAYOUT_OPTS).run();
       }
       if (e.key === "f" || e.key === "F") {
         document.documentElement.requestFullscreen?.();

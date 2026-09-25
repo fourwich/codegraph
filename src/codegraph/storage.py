@@ -270,6 +270,49 @@ def count_edges_at(conn: sqlite3.Connection, at: datetime, scope: str = "") -> i
     return int(row[0]) if row else 0
 
 
+def list_edges_at(
+    conn: sqlite3.Connection, at: datetime, scope: str = "", limit: int = 400
+) -> list[dict]:
+    """Return live edges (both endpoints valid at at) for visualization.
+
+    Each item: {"from_uid", "to_uid", "kind", "file_path", "line"}.
+    """
+    prefix = (scope or "").replace("\\", "/").rstrip("/")
+    sql = """
+    SELECT e.from_uid, e.to_uid, e.kind, e.file_path, e.line
+    FROM edges e
+    WHERE EXISTS (
+      SELECT 1 FROM nodes n_from
+      WHERE n_from.uid = e.from_uid
+        AND n_from.valid_from <= ?
+        AND (n_from.valid_to IS NULL OR n_from.valid_to >= ?)
+    ) AND EXISTS (
+      SELECT 1 FROM nodes n_to
+      WHERE n_to.uid = e.to_uid
+        AND n_to.valid_from <= ?
+        AND (n_to.valid_to IS NULL OR n_to.valid_to >= ?)
+    )
+    """
+    params: list[object] = [at.isoformat(), at.isoformat(), at.isoformat(), at.isoformat()]
+    if prefix and prefix != ".":
+        sql += " AND (e.file_path LIKE ? OR e.from_uid LIKE ? OR e.to_uid LIKE ?) "
+        like = prefix + "%"
+        params.extend([like, like, like])
+    sql += " LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
+    return [
+        {
+            "from_uid": r[0],
+            "to_uid": r[1],
+            "kind": r[2] or "uses",
+            "file_path": r[3] or "",
+            "line": r[4] or 0,
+        }
+        for r in rows
+    ]
+
+
 def query_decisions_for_line(conn: sqlite3.Connection, file_path: str, line: int) -> list[Decision]:
     """Return decisions bound to file:line only (strict line match)."""
     rows = conn.execute(
