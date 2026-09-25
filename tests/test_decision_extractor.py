@@ -40,7 +40,9 @@ def test_extract_decisions_from_commit_message() -> None:
         file_path="src/a.py",
     )
     assert found
-    assert any("because" in d.content.lower() for d in found)
+    assert any(
+        "because" in d.reason.lower() or "because" in d.content.lower() for d in found
+    )
     assert all(d.source == DecisionSource.COMMIT for d in found)
     assert "commit abc123" in found[0].source_ref
 
@@ -107,6 +109,9 @@ def test_extract_from_commits_and_changelog(tmp_path: Path) -> None:
     commit_decisions = extract_from_commits(tmp_path, depth=20)
     changelog = extract_from_changelog(tmp_path)
     assert commit_decisions
-    assert any("because" in d.content.lower() for d in commit_decisions)
+    assert any(
+        "because" in d.reason.lower() or "because" in d.content.lower()
+        for d in commit_decisions
+    )
     assert changelog
     assert all(d.source_ref.startswith("CHANGELOG") or True for d in changelog)

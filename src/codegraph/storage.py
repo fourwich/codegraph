@@ -271,27 +271,57 @@ def count_edges_at(conn: sqlite3.Connection, at: datetime, scope: str = "") -> i
 
 
 def query_decisions_for_line(conn: sqlite3.Connection, file_path: str, line: int) -> list[Decision]:
-    """Return decisions linked to file:line or that file path."""
+    """Return decisions bound to file:line only (strict line match)."""
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
         "author, file_path, line, constraints, confidence FROM decisions "
-        "WHERE (file_path = ? AND line = ?) OR (file_path = ? AND line IS NULL) "
-        "OR (file_path != '' AND file_path = ?) "
+        "WHERE file_path = ? AND line = ? "
         "ORDER BY timestamp DESC LIMIT 20",
-        (file_path, line, file_path, file_path),
+        (file_path, line),
     ).fetchall()
     return [_row_to_decision(row) for row in rows]
 
 
 def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[Decision]:
-    """Return decisions mentioning a file path."""
+    """Return decisions whose file_path equals this file (any line)."""
     prefix = file_path.replace("\\", "/")
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
         "author, file_path, line, constraints, confidence FROM decisions "
+        "WHERE file_path = ? "
+        "ORDER BY timestamp DESC LIMIT 20",
+        (prefix,),
+    ).fetchall()
+    return [_row_to_decision(row) for row in rows]
+
+
+def query_decisions_for_dir(conn: sqlite3.Connection, file_path: str, limit: int = 5) -> list[Decision]:
+    """Return decisions under the file's directory prefix (file-level fallback)."""
+    path = file_path.replace("\\", "/")
+    parent = path.rsplit("/", 1)[0] if "/" in path else ""
+    if not parent:
+        return query_all_decisions(conn)[:limit]
+    rows = conn.execute(
+        "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
+        "author, file_path, line, constraints, confidence FROM decisions "
         "WHERE file_path = ? OR file_path LIKE ? "
-        "ORDER BY timestamp ASC",
-        (prefix, prefix + "%"),
+        "ORDER BY timestamp DESC LIMIT ?",
+        (parent, parent + "/%", limit),
+    ).fetchall()
+    return [_row_to_decision(row) for row in rows]
+
+
+def query_decisions_for_commit(conn: sqlite3.Connection, commit_sha: str) -> list[Decision]:
+    """Return decisions whose source_ref mentions this commit sha."""
+    if not commit_sha:
+        return []
+    short = commit_sha[:10]
+    rows = conn.execute(
+        "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
+        "author, file_path, line, constraints, confidence FROM decisions "
+        "WHERE source_ref LIKE ? OR source_ref LIKE ? "
+        "ORDER BY timestamp DESC LIMIT 10",
+        (f"%{commit_sha}%", f"%{short}%"),
     ).fetchall()
     return [_row_to_decision(row) for row in rows]
 

@@ -44,6 +44,23 @@ def looks_like_decision(sentence: str) -> bool:
     return any(k in lower for k in DECISION_KEYWORDS)
 
 
+def split_content_reason(sentence: str) -> tuple[str, str]:
+    """Split a rationale sentence into (content, reason).
+
+    Uses because/since/so that/in order to as the reason delimiter.
+    """
+    text = " ".join(sentence.strip().split())
+    lower = text.lower()
+    for marker in (" because ", " since ", " so that ", " in order to ", " rather than "):
+        idx = lower.find(marker)
+        if idx > 0:
+            left = text[:idx].strip().rstrip(",;:")
+            right = text[idx:].strip()
+            if left:
+                return left[:220], right[:500]
+    return text[:220], ""
+
+
 def decision_from_sentence(
     sentence: str,
     *,
@@ -56,7 +73,7 @@ def decision_from_sentence(
     uid_prefix: str = "dec",
 ) -> Decision:
     """Build a Decision from one rationale sentence."""
-    content = sentence.strip()
+    content, reason = split_content_reason(sentence)
     if len(content) > 220:
         content = content[:217] + "..."
     uid = make_uid(file_path or source_ref, "decision", uid_prefix, max(line or 1, 1))
@@ -65,7 +82,7 @@ def decision_from_sentence(
     return Decision(
         uid=uid,
         content=content,
-        reason=content,
+        reason=reason,
         alternatives=[],
         status=DecisionStatus.ACCEPTED,
         source=source,

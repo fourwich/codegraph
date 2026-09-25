@@ -26,6 +26,8 @@ from codegraph.storage import (
     connect,
     db_path_for_root,
     find_node_at_line,
+    query_decisions_for_commit,
+    query_decisions_for_dir,
     query_decisions_for_file,
     query_decisions_for_line,
 )
@@ -89,37 +91,43 @@ def load_code_node_sqlite(file_path: str, line: int, root: Path | None = None) -
 
 
 def load_decisions_sqlite(
-    file_path: str, line: int, root: Path | None = None, commit_sha: str = ""
-) -> list[Decision]:
-    """Load extracted decisions from SQLite, with sample fallback."""
+    file_path: str,
+    line: int,
+    root: Path | None = None,
+    commit_sha: str = "",
+) -> tuple[list[Decision], str]:
+    """Load decisions with line → file → commit → directory fallback.
+
+    Returns:
+        (decisions, level) where level is "line", "file", "commit", or "dir".
+    """
     db_path = db_path_for_root(root or Path.cwd())
     rows: list[Decision] = []
+    level = "line"
     if db_path.exists():
         try:
             conn = connect(db_path)
         except sqlite3.Error as exc:
             console.print(f"[yellow]warn[/] Cannot open graph database {db_path}: {exc}")
-            return find_decisions_for_location(file_path, line)
+            samples = find_decisions_for_location(file_path, line)
+            return samples, ("line" if samples else "none")
         try:
             rows = query_decisions_for_line(conn, file_path, line)
             if not rows:
                 rows = query_decisions_for_file(conn, file_path)
+                level = "file"
             if not rows and commit_sha:
-                rows = [
-                    d
-                    for d in _all_decisions(conn)
-                    if commit_sha[:10] in d.source_ref or commit_sha in d.source_ref
-                ]
+                rows = query_decisions_for_commit(conn, commit_sha)
+                level = "commit"
+            if not rows:
+                rows = query_decisions_for_dir(conn, file_path, limit=5)
+                level = "dir"
         finally:
             conn.close()
     if rows:
-        return rows
+        return rows, level
     samples = find_decisions_for_location(file_path, line)
-    if samples:
-        return samples
-    if commit_sha and not rows:
-        return []
-    return samples
+    return samples, ("line" if samples else "none")
 
 
 def _all_decisions(conn) -> list[Decision]:
@@ -183,15 +191,23 @@ def render_code_node_header(node: CodeNode) -> None:
     console.print(panel)
 
 
-def build_decision_panel(decision: Decision, file_path: str, line: int) -> Panel:
+def build_decision_panel(
+    decision: Decision, file_path: str, line: int, level: str = "line"
+) -> Panel:
     """Render one decision as a Rich Panel card."""
     body = Text()
     body.append("[Location]\n", style="bold cyan")
     body.append(f"  {file_path}:{line}\n")
+    if level in {"file", "commit", "dir"}:
+        body.append(f"  binding: {level}-level decision\n", style="dim")
     body.append("[Decision]\n", style="bold yellow")
     body.append(f"  {decision.content}\n")
     body.append("[Reason]\n", style="bold yellow")
-    body.append(f"  {decision.reason or '(not recorded)'}\n")
+    reason = (decision.reason or "").strip()
+    if not reason or reason == decision.content:
+        body.append("  Not recorded\n")
+    else:
+        body.append(f"  {reason}\n")
     body.append("[Alternatives]\n", style="bold yellow")
     if decision.alternatives:
         for item in decision.alternatives:
@@ -222,13 +238,31 @@ def build_decision_panel(decision: Decision, file_path: str, line: int) -> Panel
     )
 
 
-def render_decision_card(file_path: str, line: int, decisions: list[Decision]) -> None:
-    """Render decision cards for a location."""
+def render_decision_card(
+    file_path: str, line: int, decisions: list[Decision], level: str = "line"
+) -> None:
+    """Render decision cards for a location.
+
+    Args:
+        file_path: Queried file.
+        line: Queried line.
+        decisions: Decisions to show.
+        level: Binding strength — line / file / commit / dir / none.
+    """
+    labels = {
+        "line": "line-level decision",
+        "file": "file-level decision",
+        "commit": "commit-level decision",
+        "dir": "directory-level decision",
+        "none": "decision",
+    }
+    tag = labels.get(level, "decision")
     console.print(
-        f"[bold cyan]Query[/] {file_path}:{line} → [bold]{len(decisions)}[/] matched decision(s)\n"
+        f"[bold cyan]Query[/] {file_path}:{line} → [bold]{len(decisions)}[/] matched {tag}(s)\n"
     )
     for decision in decisions[:5]:
-        console.print(build_decision_panel(decision, file_path, line))
+        panel = build_decision_panel(decision, file_path, line, level=level)
+        console.print(panel)
 
 
 def render_not_found(file_path: str, line: int | None = None) -> None:
@@ -292,7 +326,8 @@ def _load_decisions_dgraph(file_path: str, line: int) -> list[Decision]:
 
     if raw_list:
         return [decision_from_dgraph(item) for item in raw_list]
-    return load_decisions_sqlite(file_path, line)
+    rows, _level = load_decisions_sqlite(file_path, line)
+    return rows
 
 
 def why_command(
@@ -338,9 +373,10 @@ def why_command(
     if backend == "dgraph":
         node = load_code_node_dgraph(file_path, line)
         decisions = _load_decisions_dgraph(file_path, line)
+        level = "line"
     else:
         node = load_code_node_sqlite(file_path, line)
-        decisions = load_decisions_sqlite(
+        decisions, level = load_decisions_sqlite(
             file_path, line, commit_sha=node.commit_sha if node else ""
         )
 
@@ -350,6 +386,7 @@ def why_command(
             "line": line,
             "node": _node_payload(node),
             "decisions": [_decision_payload(d) for d in decisions[:10]],
+            "binding": level,
         }
         typer.echo(jsonlib.dumps(payload, ensure_ascii=False, indent=2))
         if not decisions:
@@ -363,7 +400,7 @@ def why_command(
         render_not_found(file_path, line)
         raise typer.Exit(code=1)
 
-    render_decision_card(file_path, line, decisions)
+    render_decision_card(file_path, line, decisions, level=level)
 
 
 def _node_payload(node: CodeNode | None) -> dict | None:
@@ -411,7 +448,7 @@ def decisions_command(
         file: Target file path.
         timeline: Emit oldest-first when true.
     """
-    rows = load_decisions_sqlite(file, 0)
+    rows, _level = load_decisions_sqlite(file, 0)
     if not rows:
         rows = find_decisions_for_file(file)
     prefix = normalize_location_path(file)
