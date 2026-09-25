@@ -191,8 +191,18 @@ def render_code_node_header(node: CodeNode) -> None:
     console.print(panel)
 
 
+def decision_title(decision: Decision, index: int = 1) -> str:
+    """Build a human-readable panel title (never leak internal uids)."""
+    snippet = " ".join((decision.content or "").split())
+    if snippet:
+        snippet = snippet[:40] + ("…" if len(snippet) > 40 else "")
+        return f"Decision #{index}: {snippet}"
+    ref = (decision.source_ref or "").split()[-1] if decision.source_ref else ""
+    return f"Decision #{index}" + (f" · {ref}" if ref else "")
+
+
 def build_decision_panel(
-    decision: Decision, file_path: str, line: int, level: str = "line"
+    decision: Decision, file_path: str, line: int, level: str = "line", index: int = 1
 ) -> Panel:
     """Render one decision as a Rich Panel card."""
     body = Text()
@@ -232,7 +242,7 @@ def build_decision_panel(
     body.append(f"  {format_confidence(decision.confidence)}\n")
     return Panel(
         body,
-        title=f"[bold]Decision {decision.uid[:24]}[/]",
+        title=f"[bold]{decision_title(decision, index)}[/]",
         border_style="yellow",
         padding=(1, 2),
     )
@@ -260,8 +270,8 @@ def render_decision_card(
     console.print(
         f"[bold cyan]Query[/] {file_path}:{line} → [bold]{len(decisions)}[/] matched {tag}(s)\n"
     )
-    for decision in decisions[:5]:
-        panel = build_decision_panel(decision, file_path, line, level=level)
+    for i, decision in enumerate(decisions[:5], start=1):
+        panel = build_decision_panel(decision, file_path, line, level=level, index=i)
         console.print(panel)
 
 
