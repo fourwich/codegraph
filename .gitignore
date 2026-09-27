@@ -35,3 +35,6 @@ docs-site/.vitepress/dist/
 docs-site/.vitepress/cache/
 vscode-extension/out/
 *.vsix
+
+# Video edit intermediates
+submission/video_work/
