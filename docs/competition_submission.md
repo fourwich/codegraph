@@ -57,6 +57,7 @@ Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD 
 ### Why not just ask an AI?
 
 Coding assistants are brilliant at generating code in front of them, but they cannot open a two-year-old closed issue, follow a superseded ADR, or quote the PR review that blocked a shortcut. They see the file you paste; they do not see the graph of constraints around it. CodeGraph does not replace the model — it gives the model (and the human) a provenance layer: the actual commit, the actual decision, and the line it justifies. That is the difference between a confident guess and a checkable answer.
+
 ### What's next
 
 Only unfinished work: harden the Dgraph backend against a live cluster, richer conflict rules, publish the VSCode extension to the Marketplace, and continue performance tuning on larger monorepos. I would also like CI on every OS matrix to stay green with coverage reports. No vaporware — if it is not in the repo or tests, it is not in this story.
@@ -93,17 +94,17 @@ It can. That is why it is opt-in (`--use-llm`), requires a local Ollama, and nev
 **6. Why not just ask an AI?**  
 AI sees the code you paste, not a closed issue from two years ago or the PR that rejected an option. CodeGraph attaches the real commit, the real decision, and the line it justifies — so answers are checkable, not guessed. It is a provenance layer for humans and models, not a replacement for either.
 
-**6. How is this different from Joern or CodeQL?**  
+**7. How is this different from Joern or CodeQL?**  
 Those tools excel at vulnerability and deep semantic queries. CodeGraph optimizes for **provenance**: linking a line to design decisions and history with a small local CLI. Different job — complementary, not a replacement.
 
-**7. Biggest technical hurdle?**  
+**8. Biggest technical hurdle?**  
 Correct historical edges. Naive per-file parsing drops cross-file calls and time filters counted dead edges. The fix was merge-then-extract edges and live-endpoint edge counts.
 
-**8. If you started over, what would you change?**  
+**9. If you started over, what would you change?**  
 I would define the SQLite/Dgraph schema for versioned nodes on day one, and add `--json` earlier so editors and tests share one contract.
 
-**9. Any commercial path?**  
+**10. Any commercial path?**  
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
-**10. Why build this at 15?**  
+**11. Why build this at 15?**  
 I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (49 tests, 7 commands, 6 languages).
