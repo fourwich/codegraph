@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS nodes (
   valid_to TEXT,
   commit_sha TEXT
 );
+CREATE TABLE IF NOT EXISTS decision_code_links (
+  decision_uid TEXT,
+  node_uid TEXT,
+  file_path TEXT,
+  line INTEGER
+);
 CREATE TABLE IF NOT EXISTS edges (
   from_uid TEXT,
   to_uid TEXT,
@@ -91,6 +97,7 @@ def clear_graph(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM edges")
     conn.execute("DELETE FROM nodes")
     conn.execute("DELETE FROM decisions")
+    conn.execute("DELETE FROM decision_code_links")
     conn.commit()
 
 
@@ -415,3 +422,53 @@ def _row_to_decision(row: tuple) -> Decision:
         constraints=json.loads(constraints or "[]"),
         confidence=float(confidence or 0.5),
     )
+
+
+def insert_decision_links(
+    conn: sqlite3.Connection,
+    links: list[tuple[str, str, str, int]],
+) -> None:
+    """Insert (decision_uid, node_uid, file_path, line) rows."""
+    if not links:
+        return
+    conn.executemany(
+        "INSERT INTO decision_code_links (decision_uid, node_uid, file_path, line) "
+        "VALUES (?, ?, ?, ?)",
+        links,
+    )
+    conn.commit()
+
+
+def query_decisions_for_line_links(
+    conn: sqlite3.Connection, file_path: str, line: int
+) -> list[Decision]:
+    """Return decisions linked to a concrete file:line via decision_code_links."""
+    rows = conn.execute(
+        "SELECT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
+        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence "
+        "FROM decisions d "
+        "JOIN decision_code_links l ON l.decision_uid = d.uid "
+        "WHERE l.file_path = ? AND l.line = ? "
+        "ORDER BY d.timestamp DESC LIMIT 20",
+        (file_path, line),
+    ).fetchall()
+    return [_row_to_decision(row) for row in rows]
+
+
+def query_decisions_for_node_lines(
+    conn: sqlite3.Connection,
+    file_path: str,
+    line_start: int,
+    line_end: int,
+) -> list[Decision]:
+    """Return decisions linked to any line inside a node range (line-level)."""
+    rows = conn.execute(
+        "SELECT DISTINCT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
+        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence "
+        "FROM decisions d "
+        "JOIN decision_code_links l ON l.decision_uid = d.uid "
+        "WHERE l.file_path = ? AND l.line >= ? AND l.line <= ? "
+        "ORDER BY d.timestamp DESC LIMIT 20",
+        (file_path, line_start, line_end),
+    ).fetchall()
+    return [_row_to_decision(row) for row in rows]

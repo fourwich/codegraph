@@ -20,6 +20,7 @@ from codegraph.models import (
     normalize_location_path,
 )
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
+from codegraph.git.diff import get_changed_lines
 from codegraph.storage import (
     clear_graph,
     connect,
@@ -28,6 +29,7 @@ from codegraph.storage import (
     count_nodes,
     db_path_for_root,
     init_schema,
+    insert_decision_links,
     insert_decisions,
     insert_edges,
     insert_nodes,
@@ -212,13 +214,80 @@ def _ingest_working_tree(
     all_edges.extend(edges)
 
 
+
+
+def _commit_sha_from_ref(source_ref: str) -> str:
+    """Extract a hex sha from a source_ref like 'commit abc123...'."""
+    for token in source_ref.replace(":", " ").split():
+        if len(token) >= 7 and all(c in "0123456789abcdefABCDEF" for c in token):
+            return token
+    return ""
+
+
+def bind_decisions_to_lines(
+    root: Path,
+    decisions: list[Decision],
+    nodes: list[CodeNode],
+) -> list[tuple[str, str, str, int]]:
+    """Bind commit decisions to concrete changed lines that fall inside CodeNodes.
+
+    Returns:
+        Rows for decision_code_links: (decision_uid, node_uid, file_path, line).
+    """
+    links: list[tuple[str, str, str, int]] = []
+    by_file: dict[str, list[CodeNode]] = {}
+    for node in nodes:
+        by_file.setdefault(node.file_path, []).append(node)
+
+    for decision in decisions:
+        sha = _commit_sha_from_ref(decision.source_ref)
+        if not sha:
+            # Fall back to the decision's own file:line if present
+            if decision.file_path and decision.line:
+                matches = [
+                    n
+                    for n in by_file.get(decision.file_path, [])
+                    if n.contains_line(decision.line)
+                ]
+                if matches:
+                    node = min(matches, key=lambda n: n.line_end - n.line_start)
+                    links.append((decision.uid, node.uid, decision.file_path, decision.line))
+            continue
+
+        try:
+            changed = get_changed_lines(root, sha)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("changed lines failed for %s: %s", sha, exc)
+            changed = {}
+
+        if not changed and decision.file_path and decision.line:
+            matches = [
+                n for n in by_file.get(decision.file_path, []) if n.contains_line(decision.line)
+            ]
+            if matches:
+                node = min(matches, key=lambda n: n.line_end - n.line_start)
+                links.append((decision.uid, node.uid, decision.file_path, decision.line))
+            continue
+
+        for file_path, lines in changed.items():
+            candidates = by_file.get(file_path, [])
+            for ln in lines:
+                hit = [n for n in candidates if n.contains_line(ln)]
+                if not hit:
+                    continue
+                node = min(hit, key=lambda n: n.line_end - n.line_start)
+                links.append((decision.uid, node.uid, file_path, ln))
+    return links
+
+
 def write_sqlite_graph(
     db_path: Path,
     nodes: list[CodeNode],
     edges: list[Edge],
     decisions: list[Decision],
+    links: list[tuple[str, str, str, int]] | None = None,
 ) -> tuple[int, int, int]:
-    """Persist nodes/edges/decisions and return counts."""
+    """Persist nodes/edges/decisions/links and return counts."""
     conn = connect(db_path)
     try:
         init_schema(conn)
@@ -226,6 +295,7 @@ def write_sqlite_graph(
         insert_nodes(conn, nodes)
         insert_edges(conn, edges)
         insert_decisions(conn, decisions)
+        insert_decision_links(conn, links or [])
         return count_nodes(conn), count_edges(conn), count_decisions(conn)
     finally:
         conn.close()
@@ -367,8 +437,9 @@ def index_command(
         decision_count = len(decisions)
     else:
         db_path = db_path_for_root(root)
+        links = bind_decisions_to_lines(root, decisions, all_nodes)
         node_count, edge_count, decision_count = write_sqlite_graph(
-            db_path, all_nodes, all_edges, decisions
+            db_path, all_nodes, all_edges, decisions, links
         )
 
     if as_json:

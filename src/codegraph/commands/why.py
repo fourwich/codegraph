@@ -30,6 +30,8 @@ from codegraph.storage import (
     query_decisions_for_dir,
     query_decisions_for_file,
     query_decisions_for_line,
+    query_decisions_for_line_links,
+    query_decisions_for_node_lines,
 )
 
 console = Console()
@@ -112,7 +114,11 @@ def load_decisions_sqlite(
             samples = find_decisions_for_location(file_path, line)
             return samples, ("line" if samples else "none")
         try:
-            rows = query_decisions_for_line(conn, file_path, line)
+            rows = query_decisions_for_line_links(conn, file_path, line)
+            if rows:
+                level = "line"
+            if not rows:
+                rows = query_decisions_for_line(conn, file_path, line)
             if not rows:
                 rows = query_decisions_for_file(conn, file_path)
                 level = "file"
@@ -402,6 +408,25 @@ def why_command(
         if not decisions:
             raise typer.Exit(code=1)
         return
+
+    if node is not None and level != "line":
+        try:
+            db_path = db_path_for_root(Path.cwd())
+            if db_path.exists():
+                conn = connect(db_path)
+                try:
+                    near = query_decisions_for_node_lines(
+                        conn, file_path, node.line_start, node.line_end
+                    )
+                finally:
+                    conn.close()
+            else:
+                near = []
+        except Exception:  # noqa: BLE001
+            near = []
+        if near:
+            decisions = near
+            level = "line"
 
     if node is not None:
         render_code_node_header(node)
