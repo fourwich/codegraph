@@ -1,4 +1,4 @@
-# CodeGraph — 60-second demo voiceover (English)
+﻿# CodeGraph — 60-second demo voiceover (English)
 
 Use this as the read-aloud script for the screen recording.
 
@@ -17,7 +17,7 @@ Voiceover: "git blame only shows who touched a line, not why it exists."
 [12-24s]
 Screen: run codegraph why
 Command: `codegraph why src/codegraph/cli.py:24`
-Voiceover: "CodeGraph returns a decision card: the choice, the reason, and the source."
+Voiceover: "CodeGraph doesn't guess. It reads the actual commit, the actual decision, and shows you where it came from."
 
 [24-36s]
 Screen: run codegraph graph

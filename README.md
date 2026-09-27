@@ -1,4 +1,4 @@
-# CodeGraph
+﻿# CodeGraph
 
 ![tests](https://img.shields.io/badge/tests-49%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
@@ -6,6 +6,8 @@
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
+
+Why not just ask an AI? Because AI cannot read a closed issue from two years ago. CodeGraph can.
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
