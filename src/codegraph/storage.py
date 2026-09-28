@@ -472,3 +472,22 @@ def query_decisions_for_node_lines(
         (file_path, line_start, line_end),
     ).fetchall()
     return [_row_to_decision(row) for row in rows]
+
+
+def query_decisions_at(conn: sqlite3.Connection, at_time: datetime, scope: str = "") -> list[Decision]:
+    """Return decisions known at a timestamp, optionally filtered by file prefix.
+
+    Uses decision.timestamp <= at_time (decisions are not retracted in MVP).
+    """
+    prefix = (scope or "").replace("\\", "/").rstrip("/")
+    sql = (
+        "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
+        "author, file_path, line, constraints, confidence FROM decisions "
+        "WHERE timestamp <= ? "
+    )
+    params: list[object] = [at_time.isoformat()]
+    if prefix and prefix != ".":
+        sql += "AND (file_path = ? OR file_path LIKE ? OR file_path = '') "
+        params.extend([prefix, prefix + "/%"])
+    sql += "ORDER BY timestamp ASC"
+    return [_row_to_decision(row) for row in conn.execute(sql, params).fetchall()]

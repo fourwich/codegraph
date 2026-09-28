@@ -23,7 +23,7 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 Verified with `pytest -q` and `codegraph --help` (49 tests passing).
 
 - [x] Product site (HTML / CSS / JS)
-- [x] CLI with 7 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
+- [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
 - [x] tree-sitter parsing (6 languages)
 - [x] SQLite storage
 - [x] Real Git history traversal
@@ -59,7 +59,7 @@ python -m venv .venv
 # source .venv/bin/activate && pip install -e ".[dev]"  # macOS/Linux
 ```
 
-## Commands (7)
+## Commands (8)
 
 ```bash
 codegraph --help
@@ -67,6 +67,7 @@ codegraph index . [--depth N] [--backend sqlite|dgraph] [--use-llm] [--json]
 codegraph why src/auth/session.ts:42 [--json]
 codegraph graph --at 2024-11-02 --scope src
 codegraph decisions --file src/auth/session.ts --timeline
+codegraph diff 2026-09-23 2026-09-24 --scope src
 codegraph conflicts --scope src
 codegraph export --for-ai --scope src
 codegraph serve --port 8080
@@ -146,3 +147,4 @@ Built with AI coding assistants for API discovery, debugging, and documentation.
 ## License
 
 MIT
+

@@ -1,4 +1,4 @@
-"""CodeGraph Typer CLI entrypoint."""
+﻿"""CodeGraph Typer CLI entrypoint."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import typer
 from codegraph import __version__
 from codegraph.commands.conflicts import conflicts_command
 from codegraph.commands.export import export_command
+from codegraph.commands.diff import diff_command
 from codegraph.commands.graph import graph_command
 from codegraph.commands.index import index_command
 from codegraph.commands.serve import serve_command
@@ -89,5 +90,14 @@ app.command(
 )(serve_command)
 
 
+
+app.command(
+    name="diff",
+    help="Show decision changes between two versions, e.g. diff 2026-09-23 2026-09-24 --scope src",
+    rich_help_panel="Core commands",
+)(diff_command)
+
 if __name__ == "__main__":
     app()
+
+

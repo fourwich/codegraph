@@ -224,3 +224,11 @@ def find_decisions_for_file(file_path: str) -> list[Decision]:
         d for d in SAMPLE_DECISIONS if d.file_path == prefix or d.file_path.startswith(prefix)
     ]
     return sorted(matched, key=lambda d: d.timestamp)
+
+class DecisionChange(BaseModel):
+    """A decision delta between two snapshots."""
+
+    kind: str = Field(description="added / removed / changed / superseded")
+    decision: Decision
+    old_status: str | None = Field(default=None)
+    new_status: str | None = Field(default=None)
