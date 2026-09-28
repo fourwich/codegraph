@@ -123,6 +123,7 @@ def render_json(conflicts: list[Conflict], scope: str) -> None:
                 "location": c.location,
                 "matched_words": c.matched_words,
                 "explanation": c.explanation,
+                "confidence": getattr(c, "confidence", 1.0),
             }
             for c in conflicts
         ],

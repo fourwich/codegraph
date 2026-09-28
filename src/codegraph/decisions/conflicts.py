@@ -21,7 +21,7 @@ OPPOSITE_PAIRS: list[tuple[str, ...]] = [
     ("eager", "lazy"),
 ]
 
-TEMPORAL_WINDOW_DAYS = 7
+TEMPORAL_WINDOW_DAYS = 3
 TEMPORAL_SIMILARITY = 0.3
 
 
@@ -102,28 +102,63 @@ def detect_supersede_conflicts(decisions: list[Decision]) -> list[Conflict]:
 
 
 def detect_temporal_conflicts(decisions: list[Decision]) -> list[Conflict]:
-    """Nearby accepted decisions with low text similarity."""
+    """Nearby accepted decisions that still contradict on the same file.
+
+    Tightened to cut false positives:
+    - same file_path (not merely same folder)
+    - within 3 days
+    - low text similarity
+    - must share an opposite-term pair (otherwise confidence too low)
+    """
     out: list[Conflict] = []
     accepted = [d for d in decisions if d.status == DecisionStatus.ACCEPTED]
     for i, a in enumerate(accepted):
         for b in accepted[i + 1 :]:
-            if a.uid == b.uid or not _same_place(a, b):
+            if a.uid == b.uid:
+                continue
+            if not a.file_path or a.file_path != b.file_path:
                 continue
             delta = abs((a.timestamp - b.timestamp).total_seconds())
             if delta > TEMPORAL_WINDOW_DAYS * 86400:
                 continue
             sim = SequenceMatcher(None, _text(a), _text(b)).ratio()
-            if sim < TEMPORAL_SIMILARITY:
-                out.append(
-                    Conflict(
-                        type="temporal",
-                        decision_a=a,
-                        decision_b=b,
-                        location=_location(a),
-                        matched_words=[],
-                        explanation=f"nearby in time ({delta/86400:.1f}d) but low similarity ({sim:.2f})",
-                    )
+            if sim >= TEMPORAL_SIMILARITY:
+                continue
+            ta, tb = _text(a), _text(b)
+            matched: list[str] = []
+            for group in OPPOSITE_PAIRS:
+                ha = [w for w in group if w in ta]
+                hb = [w for w in group if w in tb]
+                if ha and hb and set(ha) != set(hb):
+                    matched = sorted(set(ha) | set(hb))
+                    break
+            if not matched:
+                # No opposites: only keep very close, very different, same file
+                if delta > 3 * 86400:
+                    continue
+            days = delta / 86400
+            if matched and days <= 3:
+                confidence = 0.8
+            elif matched:
+                confidence = 0.3
+            else:
+                confidence = 0.5 if days <= 3 else 0.3
+            if confidence < 0.5:
+                continue
+            out.append(
+                Conflict(
+                    type="temporal",
+                    decision_a=a,
+                    decision_b=b,
+                    location=_location(a),
+                    matched_words=matched,
+                    explanation=(
+                        f"nearby in time ({days:.1f}d) but low similarity ({sim:.2f})"
+                        + (f" with opposites {matched}" if matched else "")
+                    ),
+                    confidence=confidence,
                 )
+            )
     return out
 
 

@@ -242,3 +242,4 @@ class Conflict(BaseModel):
     location: str = Field(default="")
     matched_words: list[str] = Field(default_factory=list)
     explanation: str = Field(default="")
+    confidence: float = Field(default=1.0)
