@@ -232,3 +232,13 @@ class DecisionChange(BaseModel):
     decision: Decision
     old_status: str | None = Field(default=None)
     new_status: str | None = Field(default=None)
+
+class Conflict(BaseModel):
+    """A detected contradiction between two decisions."""
+
+    type: str = Field(description="opposite / supersede / temporal")
+    decision_a: Decision
+    decision_b: Decision
+    location: str = Field(default="")
+    matched_words: list[str] = Field(default_factory=list)
+    explanation: str = Field(default="")

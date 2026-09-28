@@ -68,7 +68,7 @@ codegraph why src/auth/session.ts:42 [--json]
 codegraph graph --at 2024-11-02 --scope src
 codegraph decisions --file src/auth/session.ts --timeline
 codegraph diff 2026-09-23 2026-09-24 --scope src
-codegraph conflicts --scope src
+codegraph conflicts --scope src   # opposite / supersede / temporal
 codegraph export --for-ai --scope src
 codegraph serve --port 8080
 ```
@@ -147,4 +147,5 @@ Built with AI coding assistants for API discovery, debugging, and documentation.
 ## License
 
 MIT
+
 
