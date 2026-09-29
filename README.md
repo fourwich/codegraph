@@ -18,6 +18,8 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 - GitHub: https://github.com/fourwich/codegraph
 - Live demo: https://fourwich.github.io/codegraph
 
+See [benchmarks](docs/benchmarks.md) for real-project attempts and synthetic performance numbers.
+
 ## Status
 
 Verified with `pytest -q` and `codegraph --help` (49 tests passing).
@@ -147,5 +149,6 @@ Built with AI coding assistants for API discovery, debugging, and documentation.
 ## License
 
 MIT
+
 
 
