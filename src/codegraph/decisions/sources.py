@@ -10,6 +10,7 @@ from pathlib import Path
 from codegraph.decisions.extractor import (
     decision_from_adr_sections,
     decision_from_commit_subject,
+    decisions_from_commit_body,
     extract_decisions_from_text,
     parse_adr_markdown,
 )
@@ -69,6 +70,27 @@ def extract_from_commits(
             )
             if subject:
                 found.append(subject)
+            found.extend(
+                decisions_from_commit_body(
+                    commit.message,
+                    source_ref=ref,
+                    timestamp=commit.timestamp,
+                    author=commit.author,
+                    file_path=path,
+                )
+            )
+            if commit.message.lstrip().lower().startswith("merge pull request"):
+                found.extend(
+                    extract_decisions_from_text(
+                        commit.message,
+                        source=DecisionSource.PR,
+                        source_ref=ref,
+                        timestamp=commit.timestamp,
+                        author=commit.author,
+                        file_path=path,
+                        confidence=0.65,
+                    )
+                )
             if llm is not None and not _has_rationale(commit.message):
                 extra = llm.extract_decision(
                     commit.message,

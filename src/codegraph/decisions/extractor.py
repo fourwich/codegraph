@@ -1,4 +1,4 @@
-"""Rule-based decision extraction (no LLM)."""
+﻿"""Rule-based decision extraction (no LLM)."""
 
 from __future__ import annotations
 
@@ -17,25 +17,76 @@ DECISION_KEYWORDS: tuple[str, ...] = (
     "trade-off",
     "instead of",
     "chose",
+    "chose to",
+    "we chose",
+    "we picked",
+    "we decided",
     "decided",
     "so that",
     "in order to",
     "rather than",
-)
-
-CONVENTIONAL_COMMIT = re.compile(
-    r"^(?P<type>feat|fix|refactor|perf|docs|ci|chore|test)(\([^)]+\))?:\s*(?P<subject>.+)$",
-    re.IGNORECASE,
+    "switched to",
+    "migrated to",
+    "moved to",
+    "replaced",
+    "for performance",
+    "for security",
+    "for simplicity",
+    "for compatibility",
+    "for reliability",
+    "this avoids",
+    "this prevents",
+    "avoids",
+    "prevents",
+    "due to",
+    "because of",
+    "as a result of",
+    "opted for",
+    "preferred",
+    "to reduce",
+    "to avoid",
+    "to prevent",
+    "to simplify",
+    "to improve",
+    "to fix",
+    "to resolve",
+    "to support",
+    "to keep",
+    "to match",
+    "in favor of",
+    "resolves",
+    "must be",
+    "should not",
 )
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _WORD = re.compile(r"[A-Za-z][A-Za-z0-9_\-]*")
+
+CONVENTIONAL_COMMIT = re.compile(
+    r"^(?P<type>feat|fix|refactor|perf|docs|ci|chore|test|build)(\([^)]+\))?:\s*(?P<subject>.+)$",
+    re.IGNORECASE,
+)
+
+BULLET_RE = re.compile(r"^\s*[-*+]\s+(?P<text>.+)$", re.MULTILINE)
 
 
 def split_sentences(text: str) -> list[str]:
     """Split text into sentence-like fragments."""
     parts = [p.strip() for p in _SENTENCE_SPLIT.split(text) if p and p.strip()]
     return parts
+
+
+def split_commit_parts(message: str) -> tuple[str, list[str]]:
+    """Split a commit message into (subject, body_bullets_or_paragraphs)."""
+    lines = (message or "").splitlines()
+    subject = lines[0].strip() if lines else ""
+    body = "\n".join(lines[1:]).strip()
+    bullets = [m.group("text").strip() for m in BULLET_RE.finditer(body) if m.group("text").strip()]
+    if bullets:
+        return subject, bullets
+    if body:
+        return subject, [p for p in split_sentences(body) if p]
+    return subject, []
 
 
 def looks_like_decision(sentence: str) -> bool:
@@ -45,13 +96,19 @@ def looks_like_decision(sentence: str) -> bool:
 
 
 def split_content_reason(sentence: str) -> tuple[str, str]:
-    """Split a rationale sentence into (content, reason).
-
-    Uses because/since/so that/in order to as the reason delimiter.
-    """
+    """Split a rationale sentence into (content, reason)."""
     text = " ".join(sentence.strip().split())
     lower = text.lower()
-    for marker in (" because ", " since ", " so that ", " in order to ", " rather than "):
+    for marker in (
+        " because ",
+        " since ",
+        " so that ",
+        " in order to ",
+        " rather than ",
+        " due to ",
+        " because of ",
+        " as a result of ",
+    ):
         idx = lower.find(marker)
         if idx > 0:
             left = text[:idx].strip().rstrip(",;:")
@@ -71,13 +128,13 @@ def decision_from_sentence(
     file_path: str = "",
     line: int | None = None,
     uid_prefix: str = "dec",
+    confidence: float = 0.55,
 ) -> Decision:
     """Build a Decision from one rationale sentence."""
     content, reason = split_content_reason(sentence)
     if len(content) > 220:
         content = content[:217] + "..."
     uid = make_uid(file_path or source_ref, "decision", uid_prefix, max(line or 1, 1))
-    # Keep uid unique enough for multi-source extraction
     uid = f"{uid}::{hash(content) & 0xFFFF:04x}"
     return Decision(
         uid=uid,
@@ -92,7 +149,7 @@ def decision_from_sentence(
         file_path=file_path,
         line=line,
         constraints=[],
-        confidence=0.55,
+        confidence=confidence,
     )
 
 
@@ -105,22 +162,52 @@ def decision_from_commit_subject(
     file_path: str = "",
 ) -> Decision | None:
     """Build a weak Decision from a conventional commit subject line."""
-    first = (message or "").strip().splitlines()[0] if (message or "").strip() else ""
-    match = CONVENTIONAL_COMMIT.match(first)
+    subject, _body = split_commit_parts(message)
+    match = CONVENTIONAL_COMMIT.match(subject)
     if not match:
         return None
-    subject = match.group("subject").strip()
-    if not subject:
+    subject_text = match.group("subject").strip()
+    if not subject_text:
         return None
     return decision_from_sentence(
-        subject,
+        subject_text,
         source=DecisionSource.COMMIT,
         source_ref=source_ref,
         timestamp=timestamp,
         author=author,
         file_path=file_path,
         uid_prefix="commit-subject",
+        confidence=0.55,
     )
+
+
+def decisions_from_commit_body(
+    message: str,
+    *,
+    source_ref: str,
+    timestamp: datetime,
+    author: str = "",
+    file_path: str = "",
+) -> list[Decision]:
+    """Extract decisions from commit body bullets / paragraphs."""
+    _subject, parts = split_commit_parts(message)
+    out: list[Decision] = []
+    for part in parts:
+        if not looks_like_decision(part):
+            continue
+        out.append(
+            decision_from_sentence(
+                part,
+                source=DecisionSource.COMMIT,
+                source_ref=source_ref,
+                timestamp=timestamp,
+                author=author,
+                file_path=file_path,
+                uid_prefix="commit-body",
+                confidence=0.7,
+            )
+        )
+    return out
 
 
 def extract_decisions_from_text(
@@ -131,6 +218,7 @@ def extract_decisions_from_text(
     timestamp: datetime,
     author: str = "",
     file_path: str = "",
+    confidence: float = 0.55,
 ) -> list[Decision]:
     """Extract decision-like sentences from free text."""
     found: list[Decision] = []
@@ -146,6 +234,7 @@ def extract_decisions_from_text(
                 author=author,
                 file_path=file_path,
                 uid_prefix=source.value,
+                confidence=confidence,
             )
         )
     return found

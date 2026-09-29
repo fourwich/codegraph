@@ -8,7 +8,7 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | depth 300 | 200 commits / 44.1s | 17208 | 43380 | **14** | TypeScript-heavy; decision rules rarely hit |
-| expressjs/express | depth 200 | 200 commits / 45.8s | 7027 | 1180 | **109** | After JS support (`c09376c`); see [case study](case-study.md) |
+| expressjs/express | depth 200 | 200 commits / 45.8s | 7027 | 1180 | **174** | After JS support (`c09376c`); see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
