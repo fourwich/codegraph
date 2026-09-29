@@ -19,6 +19,7 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 - Live demo: https://fourwich.github.io/codegraph
 
 See [benchmarks](docs/benchmarks.md) for real-project attempts and synthetic performance numbers.
+See [case study on Express.js](docs/case-study.md) for real-world results after JavaScript support.
 
 ## Status
 
@@ -150,6 +151,7 @@ Built with AI coding assistants for API discovery, debugging, and documentation.
 ## License
 
 MIT
+
 
 
 

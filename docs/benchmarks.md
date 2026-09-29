@@ -8,13 +8,15 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | depth 300 | 200 commits / 44.1s | 17208 | 43380 | **14** | TypeScript-heavy; decision rules rarely hit |
-| expressjs/express | depth 80 | 80 commits / 15.1s | 0 | 0 | **33** | Pure JS — **not in parser set** (ts/py/java/go/rs/cpp) |
+| expressjs/express | depth 200 | 200 commits / 45.8s | 7027 | 1180 | **109** | After JS support (`c09376c`); see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
 None reached **Decisions ≥ 50**, so the case-study path was not used.
 Honest gap: JavaScript sources are not parsed yet; many commits also lack
 rationale keywords.
+
+Note: Express uses a commit message style that predates conventional commits, so fewer decisions are extracted than in newer projects. The structural index (nodes/edges) is complete.
 
 ## Synthetic repository
 
@@ -57,3 +59,4 @@ Hardware: Windows 11, Python 3.12 (`.venv`), local SSD.
 # synthetic generator used for this run
 .venv\Scripts\python.exe submission/video_work/bench_synth.py
 ```
+
