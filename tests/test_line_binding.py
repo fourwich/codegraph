@@ -89,3 +89,24 @@ def test_bind_and_query_line_links(tmp_path: Path) -> None:
         assert found and found[0].uid == "d1"
     finally:
         conn.close()
+
+def test_find_nodes_containing_lines(tmp_path: Path) -> None:
+    from codegraph.storage import find_nodes_containing_lines, insert_nodes
+
+    node = CodeNode(
+        uid="n9",
+        kind="function",
+        name="z",
+        file_path="src/z.py",
+        line_start=10,
+        line_end=20,
+        language="python",
+    )
+    conn = connect(db_path_for_root(tmp_path))
+    try:
+        init_schema(conn)
+        insert_nodes(conn, [node])
+        uids = find_nodes_containing_lines(conn, "src/z.py", [12, 99])
+        assert uids == ["n9"]
+    finally:
+        conn.close()

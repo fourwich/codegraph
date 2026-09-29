@@ -38,6 +38,8 @@ from codegraph.storage import (
 console = Console()
 logger = logging.getLogger(__name__)
 
+MAX_CHANGED_LINES = 1000  # skip line-binding on huge diffs
+
 SKIP_DIRS = {
     "node_modules",
     ".git",
@@ -256,6 +258,18 @@ def bind_decisions_to_lines(
 
         try:
             changed = get_changed_lines(root, sha)
+            total = sum(len(v) for v in changed.values())
+            if total > MAX_CHANGED_LINES:
+                # Keep binds only for lines that fall inside known CodeNodes.
+                logger.warning(
+                    "filtered line bind for %s: %s changed lines", sha, total
+                )
+                filtered: dict[str, list[int]] = {}
+                for fpath, lines in changed.items():
+                    hits = [ln for ln in lines if any(n.contains_line(ln) for n in by_file.get(fpath, []))]
+                    if hits:
+                        filtered[fpath] = hits[:200]
+                changed = filtered
         except Exception as exc:  # noqa: BLE001
             logger.warning("changed lines failed for %s: %s", sha, exc)
             changed = {}

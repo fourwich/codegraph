@@ -1,0 +1,13 @@
+﻿              Code graph snapshot · --at 2024-09-09 · --scope lib              
+┌───────────┬────────────┬────────────────────────────────────────────────────┐
+│ Metric    │ Value      │ Notes                                              │
+├───────────┼────────────┼────────────────────────────────────────────────────┤
+│ Date      │ 2024-09-09 │ valid_from <= date AND (valid_to is null OR        │
+│           │            │ valid_to >= date)                                  │
+│ Nodes     │ 0          │ CodeNode versions valid at date                    │
+│ Edges     │ 0          │ edges with both endpoints valid at date            │
+│ Decisions │ 0          │ Decision (not after this date)                     │
+└───────────┴────────────┴────────────────────────────────────────────────────┘
+
+Change summary
+  · No nodes valid at 2024-09-09 for this scope

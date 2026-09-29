@@ -1,0 +1,25 @@
+﻿Query lib/application.js:50 → 1 matched file-level decision(s)
+
+┌──────────── Decision #1: use cached slice in app.listen (#6897) ────────────┐
+│                                                                             │
+│  [Location]                                                                 │
+│    lib/application.js:50                                                    │
+│    binding: file-level decision                                             │
+│  [Decision]                                                                 │
+│    use cached slice in app.listen (#6897)                                   │
+│  [Reason]                                                                   │
+│    Not recorded                                                             │
+│  [Alternatives]                                                             │
+│    (none)                                                                   │
+│  [Source]                                                                   │
+│    commit · commit 54af593b739ea44674e4a445efa15b8024f093da                 │
+│    author: TheMysterious · date: 2025-11-23                                 │
+│  [Status]                                                                   │
+│    ✅ active                                                                │
+│  [Constraints]                                                              │
+│    (none)                                                                   │
+│  [Confidence]                                                               │
+│    ★★★☆☆  55%                                                               │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘

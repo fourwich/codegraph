@@ -26,11 +26,15 @@ CREATE TABLE IF NOT EXISTS nodes (
   commit_sha TEXT
 );
 CREATE TABLE IF NOT EXISTS decision_code_links (
-  decision_uid TEXT,
-  node_uid TEXT,
-  file_path TEXT,
-  line INTEGER
+  decision_uid TEXT NOT NULL,
+  node_uid TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  line INTEGER NOT NULL,
+  commit_sha TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (decision_uid, file_path, line)
 );
+CREATE INDEX IF NOT EXISTS idx_dcl_file_line ON decision_code_links(file_path, line);
+CREATE INDEX IF NOT EXISTS idx_dcl_decision ON decision_code_links(decision_uid);
 CREATE TABLE IF NOT EXISTS edges (
   from_uid TEXT,
   to_uid TEXT,
@@ -80,8 +84,16 @@ def connect(db_path: Path) -> sqlite3.Connection:
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables and apply lightweight migrations."""
     conn.executescript(SCHEMA_SQL)
-    _migrate_nodes(conn)
+    _migrate_nodes(conn); _migrate_links(conn)
     conn.commit()
+
+
+def _migrate_links(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(decision_code_links)")}
+    if cols and "commit_sha" not in cols:
+        conn.execute("ALTER TABLE decision_code_links ADD COLUMN commit_sha TEXT NOT NULL DEFAULT ''")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_dcl_file_line ON decision_code_links(file_path, line)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_dcl_decision ON decision_code_links(decision_uid)")
 
 
 def _migrate_nodes(conn: sqlite3.Connection) -> None:
@@ -491,3 +503,48 @@ def query_decisions_at(conn: sqlite3.Connection, at_time: datetime, scope: str =
         params.extend([prefix, prefix + "/%"])
     sql += "ORDER BY timestamp ASC"
     return [_row_to_decision(row) for row in conn.execute(sql, params).fetchall()]
+
+
+def link_decision_to_lines(
+    conn: sqlite3.Connection,
+    decision_uid: str,
+    node_uid: str,
+    file_path: str,
+    lines: list[int],
+    commit_sha: str = "",
+) -> None:
+    """Insert decision->line links, ignoring duplicate (uid, file, line) keys."""
+    if not lines:
+        return
+    rows = [
+        (decision_uid, node_uid, file_path.replace("\\", "/"), int(ln), commit_sha)
+        for ln in lines
+        if ln and ln > 0
+    ]
+    conn.executemany(
+        "INSERT OR IGNORE INTO decision_code_links "
+        "(decision_uid, node_uid, file_path, line, commit_sha) VALUES (?, ?, ?, ?, ?)",
+        rows,
+    )
+    conn.commit()
+
+
+def find_nodes_containing_lines(
+    conn: sqlite3.Connection, file_path: str, lines: list[int]
+) -> list[str]:
+    """Return distinct node uids whose range covers any of the given lines."""
+    if not lines:
+        return []
+    path = file_path.replace("\\", "/")
+    seen: list[str] = []
+    for ln in lines:
+        rows = conn.execute(
+            "SELECT DISTINCT uid FROM nodes "
+            "WHERE file_path = ? AND line_start <= ? AND line_end >= ? "
+            "ORDER BY (line_end - line_start) ASC LIMIT 5",
+            (path, ln, ln),
+        ).fetchall()
+        for (uid,) in rows:
+            if uid not in seen:
+                seen.append(uid)
+    return seen
