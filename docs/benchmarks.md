@@ -13,8 +13,8 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
 None reached **Decisions ≥ 50**, so the case-study path was not used.
-Honest gap: JavaScript sources are not parsed yet; many commits also lack
-rationale keywords.
+JavaScript sources are parsed since `c09376c` (see Express case study).
+Many old commits still lack rationale keywords.
 
 Note: Express uses a commit message style that predates conventional commits, so fewer decisions are extracted than in newer projects. The structural index (nodes/edges) is complete.
 

@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **49 tests passing** · **7 CLI commands** · **6 languages**
+Verified locally: **75 tests passing** · **8 CLI commands** · **7 languages**
 
 ---
 
@@ -38,7 +38,7 @@ I built CodeGraph in stages so each one stayed runnable.
 1. **MVP** — Typer CLI, pydantic models, Rich decision cards, SQLite schema.
 2. **Real Git** — GitPython history walks; every CodeNode version carries `valid_from` / `valid_to`; `graph --at` filters live nodes and live edges.
 3. **Decisions** — rule-based extraction from commit messages, ADR markdown, and CHANGELOG sections (keywords such as *because* / *instead of*), with conventional-commit subjects as weak evidence.
-4. **Multi-language** — tree-sitter parsers for TypeScript, Python, Java, Go, Rust, and C++ behind one registry.
+4. **Multi-language** — tree-sitter parsers for TypeScript/JavaScript, Python, Java, Go, Rust, and C++ behind one registry.
 5. **Web + export** — `codegraph serve` (FastAPI + Cytoscape) and `codegraph export --for-ai` context packs for coding agents.
 6. **Editor + LLM** — VSCode “Show decision” using JSON output; optional Ollama extraction (`--use-llm`) that degrades to rules when offline.
 
@@ -66,7 +66,7 @@ Only unfinished work: harden the Dgraph backend against a live cluster, richer c
 
 Python, Typer, Rich, pydantic, tree-sitter, tree-sitter-typescript, tree-sitter-python, tree-sitter-java, tree-sitter-go, tree-sitter-rust, tree-sitter-cpp, GitPython, SQLite, FastAPI, Uvicorn, Cytoscape.js, httpx, Ollama, Dgraph, pydgraph, pytest, TypeScript, VS Code Extension API, GitHub Actions, MIT License
 
-*(25 tags; all appear in `pyproject.toml`, `vscode-extension/`, or workflows.)*
+*(JS uses the TypeScript grammar; VS Code extension ships as `codegraph-vscode-0.1.0.vsix`.)*
 
 ## 4. Try it out
 
@@ -107,4 +107,4 @@ I would define the SQLite/Dgraph schema for versioned nodes on day one, and add 
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (49 tests, 7 commands, 6 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (75 tests, 8 commands, 7 languages).

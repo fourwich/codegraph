@@ -13,7 +13,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 7 CLI commands · 6 languages · SQLite default · optional Dgraph
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -25,7 +25,7 @@ See [case study on Express.js](docs/case-study.md) for real-world results after 
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (49 tests passing).
+Verified with `pytest -q` and `codegraph --help` (75 tests passing).
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
@@ -34,9 +34,9 @@ Verified with `pytest -q` and `codegraph --help` (49 tests passing).
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG
 - [x] Real time-travel queries (`graph --at`)
-- [x] 49 tests passing
+- [x] 75 tests passing
 - [x] Local web visualization (`codegraph serve`)
-- [x] VSCode extension sources + `why --json`
+- [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
 - [ ] Dgraph backend (client + flag done; live cluster optional)
 
@@ -98,7 +98,7 @@ codegraph serve --port 8080
 | Storage | SQLite (default) · Dgraph (optional) |
 | Web | FastAPI · Uvicorn · Cytoscape.js |
 | LLM (optional) | Ollama via httpx |
-| Editor | VSCode extension (TypeScript) |
+| Editor | VSCode extension (TypeScript, `vscode-extension/`) |
 | Tests | pytest |
 
 ## Tests

@@ -41,6 +41,7 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 
 - **CodeNode** — `uid, kind, name, file_path, line_start, line_end, language, valid_from, valid_to, parent_uid`
 - **Edge** — `from_uid, to_uid, kind` (`uses` / `defined_by` / `contains`)
+- **decision_code_links** — decision_uid / node_uid / file_path / line / commit_sha
 - **Decision** — `content, reason, alternatives, status, source, source_ref, timestamp, author, constraints, confidence`
 
 ---
@@ -79,15 +80,15 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | Status | Item |
 |---|---|
 | ✅ Done | Product site (HTML / CSS / JS) |
-| ✅ Done | CLI with 7 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`) |
+| ✅ Done | CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`) |
 | ✅ Done | tree-sitter parsing for TypeScript, Python, Java, Go, Rust, C++ |
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 49 tests passing (`pytest -q`) |
+| ✅ Done | 75 tests passing (`pytest -q`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
-| ✅ Done | VSCode extension sources + `why --json` |
+| ✅ Done | VSCode extension + `why --json` (vsix installable) |
 | ✅ Done | Optional Ollama LLM extraction hook (`--use-llm`) |
 | 🚧 In progress | Dgraph backend (client + `--backend dgraph` implemented; live cluster optional) |
 | ⬜ Planned | Dgraph multi-hop query hardening |
