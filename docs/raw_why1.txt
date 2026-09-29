@@ -1,4 +1,0 @@
-﻿No decision record found
-No Decision bound to lib/router/index.js:100. Try:
-  codegraph index <repo> --depth 50   # build the graph first
-  codegraph decisions --file <path> --timeline
