@@ -1,11 +1,21 @@
 [project]
-name = "codegraph"
+name = "codegraphx"
 version = "0.1.0"
 description = "Turn code structure, history, and design decisions into one queryable graph"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "CodeGraph Contributors" }]
+keywords = ["code-graph", "provenance", "git", "tree-sitter", "developer-tools"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Version Control :: Git",
+]
 dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
@@ -35,6 +45,12 @@ dev = [
     "httpx>=0.27.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/fourwich/codegraph"
+Repository = "https://github.com/fourwich/codegraph"
+Documentation = "https://github.com/fourwich/codegraph#readme"
+"Bug Tracker" = "https://github.com/fourwich/codegraph/issues"
+
 [project.scripts]
 codegraph = "codegraph.cli:app"
 
@@ -44,6 +60,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codegraph"]
+artifacts = ["src/codegraph/web/static/**"]
 
 [tool.ruff]
 line-length = 100

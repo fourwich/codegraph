@@ -1,6 +1,8 @@
 ﻿# CodeGraph
 
-![tests](https://img.shields.io/badge/tests-49%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
+[![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
+[![Downloads](https://img.shields.io/pypi/dm/codegraphx)](https://pypi.org/project/codegraphx/)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -51,6 +53,14 @@ Verified with `pytest -q` and `codegraph --help` (49 tests passing).
 | C++ | `.cpp` `.cc` `.cxx` `.hpp` `.hh` `.hxx` `.h` | `treesitter_cpp.py` |
 
 ## Quick start
+
+`ash
+pip install codegraphx
+codegraph index .
+codegraph why src/main.py:42
+`
+
+Or from source:
 
 ```bash
 # recommended: uv
