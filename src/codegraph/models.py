@@ -82,6 +82,7 @@ class Decision(BaseModel):
     line: int | None = Field(default=None, description="Linked line number")
     constraints: list[str] = Field(default_factory=list, description="Related constraints")
     confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence 0-1")
+    category: str = Field(default="design", description="design | dependency")
 
     def matches_location(self, file_path: str, line: int) -> bool:
         """Return True when this decision is bound to a file:line."""

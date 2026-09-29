@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS decisions (
   file_path TEXT,
   line INT,
   constraints TEXT,
-  confidence REAL
+  confidence REAL,
+  category TEXT
 );
 """
 
@@ -84,8 +85,17 @@ def connect(db_path: Path) -> sqlite3.Connection:
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables and apply lightweight migrations."""
     conn.executescript(SCHEMA_SQL)
-    _migrate_nodes(conn); _migrate_links(conn)
+    _migrate_nodes(conn); _migrate_decision_category(conn); _migrate_links(conn)
     conn.commit()
+
+
+def _migrate_decision_category(conn: sqlite3.Connection) -> None:
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(decisions)")}
+        if cols and "category" not in cols:
+            conn.execute("ALTER TABLE decisions ADD COLUMN category TEXT DEFAULT 'design'")
+    except sqlite3.Error:
+        pass
 
 
 def _migrate_links(conn: sqlite3.Connection) -> None:
@@ -159,8 +169,8 @@ def insert_decisions(conn: sqlite3.Connection, decisions: list[Decision]) -> Non
     conn.executemany(
         "INSERT OR REPLACE INTO decisions "
         "(uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "author, file_path, line, constraints, confidence, category) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 d.uid,
@@ -176,6 +186,7 @@ def insert_decisions(conn: sqlite3.Connection, decisions: list[Decision]) -> Non
                 d.line,
                 json.dumps(d.constraints, ensure_ascii=False),
                 d.confidence,
+                getattr(d, "category", "design"),
             )
             for d in decisions
         ],
@@ -336,7 +347,7 @@ def query_decisions_for_line(conn: sqlite3.Connection, file_path: str, line: int
     """Return decisions bound to file:line only (strict line match)."""
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "WHERE file_path = ? AND line = ? "
         "ORDER BY timestamp DESC LIMIT 20",
         (file_path, line),
@@ -349,7 +360,7 @@ def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[D
     prefix = file_path.replace("\\", "/")
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "WHERE file_path = ? "
         "ORDER BY timestamp DESC LIMIT 20",
         (prefix,),
@@ -365,7 +376,7 @@ def query_decisions_for_dir(conn: sqlite3.Connection, file_path: str, limit: int
         return query_all_decisions(conn)[:limit]
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "WHERE file_path = ? OR file_path LIKE ? "
         "ORDER BY timestamp DESC LIMIT ?",
         (parent, parent + "/%", limit),
@@ -380,7 +391,7 @@ def query_decisions_for_commit(conn: sqlite3.Connection, commit_sha: str) -> lis
     short = commit_sha[:10]
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "WHERE source_ref LIKE ? OR source_ref LIKE ? "
         "ORDER BY timestamp DESC LIMIT 10",
         (f"%{commit_sha}%", f"%{short}%"),
@@ -392,7 +403,7 @@ def query_all_decisions(conn: sqlite3.Connection) -> list[Decision]:
     """Return all stored decisions."""
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "ORDER BY timestamp ASC"
     ).fetchall()
     return [_row_to_decision(row) for row in rows]
@@ -402,6 +413,9 @@ def _row_to_decision(row: tuple) -> Decision:
     """Map a decisions row to Decision."""
     from codegraph.models import DecisionSource, DecisionStatus
 
+    items = list(row)
+    if len(items) == 13:
+        items.append("design")
     (
         uid,
         content,
@@ -416,7 +430,8 @@ def _row_to_decision(row: tuple) -> Decision:
         line,
         constraints,
         confidence,
-    ) = row
+        category,
+    ) = items
     status_val = status if status in DecisionStatus._value2member_map_ else "accepted"
     source_val = source if source in DecisionSource._value2member_map_ else "commit"
     return Decision(
@@ -433,6 +448,7 @@ def _row_to_decision(row: tuple) -> Decision:
         line=line,
         constraints=json.loads(constraints or "[]"),
         confidence=float(confidence or 0.5),
+        category=str(category or "design"),
     )
 
 
@@ -494,7 +510,7 @@ def query_decisions_at(conn: sqlite3.Connection, at_time: datetime, scope: str =
     prefix = (scope or "").replace("\\", "/").rstrip("/")
     sql = (
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence FROM decisions "
+        "author, file_path, line, constraints, confidence, category FROM decisions "
         "WHERE timestamp <= ? "
     )
     params: list[object] = [at_time.isoformat()]

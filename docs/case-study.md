@@ -12,7 +12,7 @@ Express is one of the most widely used Node.js web frameworks. Its Git history s
 - Files parsed: JavaScript under `lib/`, `examples/`, root
 - Nodes: **7027**
 - Edges: **1180**
-- Decisions extracted: **174**
+- Decisions extracted: **174** (120 design + 54 dependency)
 - Languages: JavaScript (`.js` / `.mjs` / `.cjs`)
 - Index wall time: **45.8 s** (includes historical snapshots)
 

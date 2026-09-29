@@ -359,6 +359,7 @@ def why_command(
         "--json",
         help="Emit machine-readable JSON instead of Rich cards",
     ),
+    include_dependency: bool = typer.Option(False, "--include-dependency", help="Include dependency-bump decisions"),
 ) -> None:
     """Query decision cards for a source location.
 
@@ -395,6 +396,8 @@ def why_command(
         decisions, level = load_decisions_sqlite(
             file_path, line, commit_sha=node.commit_sha if node else ""
         )
+        if not include_dependency:
+            decisions = [d for d in decisions if getattr(d, "category", "design") != "dependency"]
 
     if as_json:
         payload = {

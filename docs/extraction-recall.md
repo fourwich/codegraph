@@ -23,3 +23,14 @@ Rules stay non-LLM. Changes:
 ## Notes
 
 Many Express commits are dependency bumps — they are weak decisions, not architectural rationales. Body bullets and explicit “because / to fix / switched to” phrasing produce higher-confidence hits.
+
+
+## Quality split (Express, after category field)
+
+| Category | Count | Share |
+|---|---|---|
+| design | 120 | 69% |
+| dependency (bump / build(deps)) | 54 | 31% |
+| **Total** | **174** | |
+
+`why` hides dependency rows by default (`--include-dependency` to show them).

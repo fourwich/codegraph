@@ -169,7 +169,8 @@ def decision_from_commit_subject(
     subject_text = match.group("subject").strip()
     if not subject_text:
         return None
-    return decision_from_sentence(
+    dep = is_dependency_commit(subject) or is_dependency_commit(subject_text)
+    decision = decision_from_sentence(
         subject_text,
         source=DecisionSource.COMMIT,
         source_ref=source_ref,
@@ -177,8 +178,11 @@ def decision_from_commit_subject(
         author=author,
         file_path=file_path,
         uid_prefix="commit-subject",
-        confidence=0.55,
+        confidence=0.5 if dep else 0.55,
     )
+    if dep:
+        decision.category = "dependency"
+    return decision
 
 
 def decisions_from_commit_body(
@@ -321,3 +325,14 @@ def decision_from_adr_sections(
         constraints=constraints,
         confidence=0.8,
     )
+
+
+DEPENDENCY_RE = re.compile(
+    r"^(build\(deps|chore\(deps|bump |update .* to v?\d|dependabot)",
+    re.IGNORECASE,
+)
+
+
+def is_dependency_commit(text: str) -> bool:
+    """Return True when a commit subject looks like a dependency bump."""
+    return bool(DEPENDENCY_RE.match((text or "").strip()))

@@ -23,7 +23,8 @@ def test_build_commit_type_is_weak_decision() -> None:
         timestamp=TS,
     )
     assert d is not None
-    assert d.confidence == 0.55
+    assert d.confidence == 0.5
+    assert d.category == "dependency"
 
 
 def test_looks_like_decision_extended_keywords() -> None:
