@@ -26,7 +26,7 @@ Verified with `pytest -q` and `codegraph --help` (49 tests passing).
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
-- [x] tree-sitter parsing (6 languages)
+- [x] tree-sitter parsing (7 languages)
 - [x] SQLite storage
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG
@@ -42,6 +42,7 @@ Verified with `pytest -q` and `codegraph --help` (49 tests passing).
 | Language | Extensions | Parser |
 |---|---|---|
 | TypeScript | `.ts` `.tsx` | `treesitter_ts.py` |
+| JavaScript | `.js` `.mjs` `.cjs` | `treesitter_js.py` |
 | Python | `.py` | `treesitter_py.py` |
 | Java | `.java` | `treesitter_java.py` |
 | Go | `.go` | `treesitter_go.py` |
@@ -149,6 +150,7 @@ Built with AI coding assistants for API discovery, debugging, and documentation.
 ## License
 
 MIT
+
 
 
 

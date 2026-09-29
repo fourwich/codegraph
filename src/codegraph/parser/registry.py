@@ -10,16 +10,24 @@ from codegraph.parser.treesitter_go import GoParser
 from codegraph.parser.treesitter_java import JavaParser
 from codegraph.parser.treesitter_py import PythonParser
 from codegraph.parser.treesitter_rust import RustParser
+from codegraph.parser.treesitter_js import JavaScriptParser
 from codegraph.parser.treesitter_ts import TypeScriptParser
 
 TS_SUFFIXES = {".ts", ".tsx"}
+JS_SUFFIXES = {".js", ".mjs", ".cjs"}
 PY_SUFFIXES = {".py"}
 JAVA_SUFFIXES = {".java"}
 GO_SUFFIXES = {".go"}
 RUST_SUFFIXES = {".rs"}
 CPP_SUFFIXES = {".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h"}
 SUPPORTED_SUFFIXES = (
-    TS_SUFFIXES | PY_SUFFIXES | JAVA_SUFFIXES | GO_SUFFIXES | RUST_SUFFIXES | CPP_SUFFIXES
+    TS_SUFFIXES
+    | JS_SUFFIXES
+    | PY_SUFFIXES
+    | JAVA_SUFFIXES
+    | GO_SUFFIXES
+    | RUST_SUFFIXES
+    | CPP_SUFFIXES
 )
 
 
@@ -33,6 +41,8 @@ def get_parser_for_path(path: Path) -> BaseParser | None:
         A BaseParser instance, or None.
     """
     suffix = path.suffix.lower()
+    if suffix in JS_SUFFIXES:
+        return JavaScriptParser()
     if suffix in TS_SUFFIXES:
         return TypeScriptParser()
     if suffix in PY_SUFFIXES:
@@ -56,6 +66,8 @@ def is_supported_source(path: Path) -> bool:
 def language_of(path: Path) -> str:
     """Return the logical language name for a path."""
     suffix = path.suffix.lower()
+    if suffix in JS_SUFFIXES:
+        return "javascript"
     if suffix in TS_SUFFIXES:
         return "typescript"
     if suffix in PY_SUFFIXES:
