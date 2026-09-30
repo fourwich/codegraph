@@ -146,6 +146,27 @@ def test_graph_at_after_reindex_is_stable(tmp_path: Path) -> None:
     assert len(_graph_state(root)["shas"]) >= 1
 
 
+def test_write_is_idempotent_for_duplicate_edges(tmp_path: Path) -> None:
+    """The same edge derived twice is stored once."""
+    from codegraph.commands.index import write_sqlite_graph
+    from codegraph.models import CodeNode, Edge
+
+    node = CodeNode(
+        uid="n1",
+        kind="function",
+        name="f",
+        file_path="a.py",
+        line_start=1,
+        line_end=3,
+        language="python",
+    )
+    edge = Edge(from_uid="n1", to_uid="n1", kind="uses", file_path="a.py", line=1)
+    _, edge_count, _ = write_sqlite_graph(
+        db_path_for_root(tmp_path), [node], [edge, edge], []
+    )
+    assert edge_count == 1
+
+
 def test_truncated_graph_is_rebuilt(tmp_path: Path) -> None:
     """A graph truncated behind our back is detected and rebuilt."""
     root = _make_repo(tmp_path)

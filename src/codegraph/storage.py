@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from codegraph.models import CodeNode, Decision, Edge
+from codegraph.models import CodeNode, Decision, DecisionTier, Edge
 
 DEFAULT_DB_REL = Path(".codegraph") / "graph.db"
 
@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS decisions (
   line INT,
   constraints TEXT,
   confidence REAL,
-  category TEXT
+  category TEXT,
+  tier TEXT DEFAULT 'decision'
 );
 """
 
@@ -92,8 +93,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
 def _migrate_decision_category(conn: sqlite3.Connection) -> None:
     try:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(decisions)")}
-        if cols and "category" not in cols:
+        if not cols:
+            return
+        if "category" not in cols:
             conn.execute("ALTER TABLE decisions ADD COLUMN category TEXT DEFAULT 'design'")
+        if "tier" not in cols:
+            conn.execute("ALTER TABLE decisions ADD COLUMN tier TEXT DEFAULT 'decision'")
     except sqlite3.Error:
         pass
 
@@ -221,13 +226,19 @@ def insert_edges(conn: sqlite3.Connection, edges: list[Edge]) -> None:
     conn.commit()
 
 
+def _tier_value(decision: Decision) -> str:
+    """Serialize a decision tier, tolerating plain strings from old callers."""
+    tier = getattr(decision, "tier", DecisionTier.DECISION)
+    return tier.value if isinstance(tier, DecisionTier) else str(tier)
+
+
 def insert_decisions(conn: sqlite3.Connection, decisions: list[Decision]) -> None:
     """Bulk insert extracted decisions."""
     conn.executemany(
         "INSERT OR REPLACE INTO decisions "
         "(uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "author, file_path, line, constraints, confidence, category, tier) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 d.uid,
@@ -244,6 +255,7 @@ def insert_decisions(conn: sqlite3.Connection, decisions: list[Decision]) -> Non
                 json.dumps(d.constraints, ensure_ascii=False),
                 d.confidence,
                 getattr(d, "category", "design"),
+                _tier_value(d),
             )
             for d in decisions
         ],
@@ -426,7 +438,7 @@ def query_decisions_for_line(conn: sqlite3.Connection, file_path: str, line: int
     """Return decisions bound to file:line only (strict line match)."""
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "WHERE file_path = ? AND line = ? "
         "ORDER BY timestamp DESC LIMIT 20",
         (file_path, line),
@@ -439,7 +451,7 @@ def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[D
     prefix = file_path.replace("\\", "/")
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "WHERE file_path = ? "
         "ORDER BY timestamp DESC LIMIT 20",
         (prefix,),
@@ -455,7 +467,7 @@ def query_decisions_for_dir(conn: sqlite3.Connection, file_path: str, limit: int
         return query_all_decisions(conn)[:limit]
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "WHERE file_path = ? OR file_path LIKE ? "
         "ORDER BY timestamp DESC LIMIT ?",
         (parent, parent + "/%", limit),
@@ -470,7 +482,7 @@ def query_decisions_for_commit(conn: sqlite3.Connection, commit_sha: str) -> lis
     short = commit_sha[:10]
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "WHERE source_ref LIKE ? OR source_ref LIKE ? "
         "ORDER BY timestamp DESC LIMIT 10",
         (f"%{commit_sha}%", f"%{short}%"),
@@ -482,19 +494,23 @@ def query_all_decisions(conn: sqlite3.Connection) -> list[Decision]:
     """Return all stored decisions."""
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "ORDER BY timestamp ASC"
     ).fetchall()
     return [_row_to_decision(row) for row in rows]
 
 
 def _row_to_decision(row: tuple) -> Decision:
-    """Map a decisions row to Decision."""
-    from codegraph.models import DecisionSource, DecisionStatus
+    """Map a decisions row to Decision.
+
+    Rows from older schemas may miss `category` and `tier`; they are padded so
+    an existing database keeps reading.
+    """
+    from codegraph.models import DecisionSource, DecisionStatus, DecisionTier
 
     items = list(row)
-    if len(items) == 13:
-        items.append("design")
+    while len(items) < 15:
+        items.append(None)
     (
         uid,
         content,
@@ -510,9 +526,13 @@ def _row_to_decision(row: tuple) -> Decision:
         constraints,
         confidence,
         category,
-    ) = items
+        tier,
+    ) = items[:15]
     status_val = status if status in DecisionStatus._value2member_map_ else "accepted"
     source_val = source if source in DecisionSource._value2member_map_ else "commit"
+    tier_val = str(tier or DecisionTier.DECISION.value)
+    if tier_val not in DecisionTier._value2member_map_:
+        tier_val = DecisionTier.DECISION.value
     return Decision(
         uid=uid,
         content=content or "",
@@ -528,6 +548,7 @@ def _row_to_decision(row: tuple) -> Decision:
         constraints=json.loads(constraints or "[]"),
         confidence=float(confidence or 0.5),
         category=str(category or "design"),
+        tier=DecisionTier(tier_val),
     )
 
 
@@ -553,7 +574,7 @@ def query_decisions_for_line_links(
     rows = conn.execute(
         "SELECT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
         "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence, "
-        "d.category "
+        "d.category, d.tier "
         "FROM decisions d "
         "JOIN decision_code_links l ON l.decision_uid = d.uid "
         "WHERE l.file_path = ? AND l.line = ? "
@@ -573,7 +594,7 @@ def query_decisions_for_node_lines(
     rows = conn.execute(
         "SELECT DISTINCT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
         "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence, "
-        "d.category "
+        "d.category, d.tier "
         "FROM decisions d "
         "JOIN decision_code_links l ON l.decision_uid = d.uid "
         "WHERE l.file_path = ? AND l.line >= ? AND l.line <= ? "
@@ -591,7 +612,7 @@ def query_decisions_at(conn: sqlite3.Connection, at_time: datetime, scope: str =
     prefix = (scope or "").replace("\\", "/").rstrip("/")
     sql = (
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-        "author, file_path, line, constraints, confidence, category FROM decisions "
+        "author, file_path, line, constraints, confidence, category, tier FROM decisions "
         "WHERE timestamp <= ? "
     )
     params: list[object] = [at_time.isoformat()]

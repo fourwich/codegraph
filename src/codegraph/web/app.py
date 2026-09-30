@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from codegraph.commands.why import decision_from_dgraph
-from codegraph.models import Decision, normalize_location_path
+from codegraph.models import Decision, normalize_location_path, select_decisions
 from codegraph.storage import (
     connect,
     count_edges_at,
@@ -40,7 +40,9 @@ def _load_graph_sqlite(at: datetime, scope: str) -> dict[str, Any]:
         edge_count = count_edges_at(conn, at, scope)
         edges = list_edges_at(conn, at, scope, limit=400)
         all_decisions = [
-            d for d in query_all_decisions(conn) if d.timestamp.date() <= at.date()
+            d
+            for d in select_decisions(query_all_decisions(conn))
+            if d.timestamp.date() <= at.date()
         ]
         prefix = normalize_location_path(scope)
         scoped = []
@@ -178,6 +180,7 @@ def create_app() -> FastAPI:
                     decisions = query_decisions_for_line(conn, path, line)
                     if not decisions:
                         decisions = query_decisions_for_file(conn, path)
+                    decisions = select_decisions(decisions)
                 finally:
                     conn.close()
         return JSONResponse(
@@ -204,7 +207,7 @@ def create_app() -> FastAPI:
                 client.close()
             except DgraphConnectionError as exc:
                 raise HTTPException(status_code=503, detail=str(exc)) from exc
-            decisions = [decision_from_dgraph(item) for item in raw]
+            decisions = select_decisions([decision_from_dgraph(item) for item in raw])
         else:
             db_path = _sqlite_path()
             decisions = []
@@ -216,6 +219,7 @@ def create_app() -> FastAPI:
                         if file
                         else query_all_decisions(conn)
                     )
+                    decisions = select_decisions(decisions)
                 finally:
                     conn.close()
         return JSONResponse({"decisions": [_decision_json(d) for d in decisions]})

@@ -36,14 +36,15 @@ def _node(uid: str, line_start: int, line_end: int, valid_from: datetime,
 
 
 class _StubHistory:
-    """Minimal GitHistory stand-in: serves one fixed file text."""
+    """Minimal GitHistory stand-in: serves fixed file text per commit."""
 
-    def __init__(self, root: Path, text: str) -> None:
+    def __init__(self, root: Path, text: str | dict[str, str]) -> None:
         self.root = root
-        self._text = text
+        self._default = text if isinstance(text, str) else ""
+        self._by_sha = text if isinstance(text, dict) else {}
 
     def get_file_at_commit(self, commit_sha: str, file_path: str) -> str:
-        return self._text
+        return self._by_sha.get(commit_sha, self._default)
 
 
 def test_find_node_at_line_ignores_dead_nodes(tmp_path: Path) -> None:
@@ -109,6 +110,42 @@ def test_no_duplicate_live_versions(tmp_path: Path) -> None:
     assert len([n for n in versions if n.valid_to is None]) == 1
     assert len(versions) == 2
     assert versions[0].valid_to == later.timestamp
+
+
+def test_reingesting_an_older_commit_does_not_fork_versions(tmp_path: Path) -> None:
+    """Re-reading history after an amend/rebase must not invert the timeline."""
+    older_sha, newer_sha = "a" * 40, "b" * 40
+    history = _StubHistory(
+        tmp_path,
+        {older_sha: "def f():\n    return 1\n", newer_sha: "def f():\n    return 2\n"},
+    )
+    newer = CommitInfo(
+        sha=newer_sha,
+        author="a",
+        timestamp=NOW + timedelta(hours=1),
+        message="feat: f",
+        changed_files=["src/x.py"],
+    )
+    live: dict = {}
+    all_nodes: list[CodeNode] = []
+    all_edges: list = []
+    ingest_commit(history, newer, live, all_nodes, all_edges)
+    assert len(all_nodes) == 1
+
+    older = CommitInfo(
+        sha=older_sha,
+        author="a",
+        timestamp=NOW,
+        message="feat: f",
+        changed_files=["src/x.py"],
+    )
+    ingest_commit(history, older, live, all_nodes, all_edges)
+
+    versions = live[("src/x.py", "f")]
+    assert len(all_nodes) == 1, "re-reading an older commit forked a version"
+    assert len(versions) == 1
+    assert versions[0].valid_to is None
+    assert versions[0].commit_sha == newer_sha
 
 
 def test_legacy_duplicate_live_versions_are_repaired() -> None:

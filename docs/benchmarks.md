@@ -1,4 +1,4 @@
-﻿# Benchmarks
+# Benchmarks
 
 Real-repo attempts first, then a synthetic scale test. Numbers come from
 `codegraph index` and in-process SQLite queries on this machine.
@@ -8,13 +8,22 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | depth 300 | 200 commits / 44.1s | 17208 | 43380 | **14** | TypeScript-heavy; decision rules rarely hit |
-| expressjs/express | depth 200 | 200 commits / 45.8s | 7027 | 1180 | **174** | After JS support (`c09376c`); see [case study](case-study.md) |
+| expressjs/express | depth 200 | 200 commits / ~66s | 5920 | 883 | **5** (of 204 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
-None reached **Decisions ≥ 50**, so the case-study path was not used.
-JavaScript sources are parsed since `c09376c` (see Express case study).
-Many old commits still lack rationale keywords.
+Express numbers from July 2026: **5920 nodes / 883 edges / 204 records**, of
+which **5 are decisions** and 199 are history events. The earlier
+"7027 nodes / 1180 edges / 174 decisions" was measured before duplicate node
+versions and dangling edges were removed, and before commit subjects stopped
+counting as decisions.
+
+`Decisions` counts only records that state a reason or a rejected alternative.
+Re-measure any repository with:
+
+```bash
+python scripts/eval_decision_precision.py <repo> --depth 200
+```
 
 Note: Express uses a commit message style that predates conventional commits, so fewer decisions are extracted than in newer projects. The structural index (nodes/edges) is complete.
 
@@ -33,7 +42,7 @@ Note: Express uses a commit message style that predates conventional commits, so
 | Commits walked | 1 |
 | Nodes | 7500 |
 | Edges | 0 (no inter-function calls in the fixture) |
-| Decisions | 102 (100 ADR + 2 from commit text) |
+| Decisions | 102 (100 ADR + 2 from commit text) — measured before the tier model |
 
 ### Query performance (in-process, 50 runs)
 
@@ -58,5 +67,8 @@ Hardware: Windows 11, Python 3.12 (`.venv`), local SSD.
 ```bash
 # synthetic generator used for this run
 .venv\Scripts\python.exe submission/video_work/bench_synth.py
+
+# decision precision on any repository
+.venv\Scripts\python.exe scripts/eval_decision_precision.py <repo> --depth 200
 ```
 

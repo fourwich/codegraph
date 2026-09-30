@@ -30,6 +30,18 @@ class DecisionSource(str, Enum):
     COMMENT = "comment"
 
 
+class DecisionTier(str, Enum):
+    """How much of a decision a record actually is.
+
+    Only ``DECISION`` records carry a rationale (a reason clause or a rejected
+    alternative) and are shown by default. ``EVENT`` records are plain history —
+    a commit subject, a changelog line — useful as context, never as an answer.
+    """
+
+    DECISION = "decision"
+    EVENT = "event"
+
+
 class CodeNode(BaseModel):
     """A code structure node: function, class, variable, or file."""
 
@@ -83,15 +95,51 @@ class Decision(BaseModel):
     constraints: list[str] = Field(default_factory=list, description="Related constraints")
     confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence 0-1")
     category: str = Field(default="design", description="design | dependency")
+    tier: DecisionTier = Field(
+        default=DecisionTier.DECISION,
+        description="decision (has a rationale) | event (plain history)",
+    )
 
     def matches_location(self, file_path: str, line: int) -> bool:
         """Return True when this decision is bound to a file:line."""
         return self.file_path == file_path and self.line == line
 
+    def has_rationale(self) -> bool:
+        """True when the record states a reason or a rejected alternative."""
+        return bool((self.reason or "").strip()) or bool(self.alternatives)
+
 
 def normalize_location_path(raw: str) -> str:
     """Normalize a user path to forward slashes for matching."""
     return raw.strip().replace("\\", "/").lstrip("./")
+
+
+def select_decisions(
+    decisions: list[Decision],
+    *,
+    include_events: bool = False,
+    include_dependency: bool = False,
+) -> list[Decision]:
+    """Return the records a default query should show.
+
+    Args:
+        decisions: Candidate records.
+        include_events: Also return event-tier records (plain history).
+        include_dependency: Also return dependency-category decisions.
+
+    Returns:
+        Decision-tier, non-dependency records by default.
+    """
+    out: list[Decision] = []
+    for decision in decisions:
+        if decision.tier is not DecisionTier.DECISION:
+            if include_events:
+                out.append(decision)
+            continue
+        if decision.category == "dependency" and not include_dependency:
+            continue
+        out.append(decision)
+    return out
 
 
 def make_uid(file_path: str, kind: str, name: str, line_start: int, commit_sha: str = "") -> str:

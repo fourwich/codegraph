@@ -15,7 +15,7 @@ from codegraph.decisions.extractor import (
     parse_adr_markdown,
 )
 from codegraph.git.history import GitHistory
-from codegraph.models import Decision, DecisionSource
+from codegraph.models import Decision, DecisionSource, DecisionTier
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +53,7 @@ def extract_from_commits(
         try:
             ref = f"commit {commit.sha}"
             path = commit.changed_files[0] if commit.changed_files else ""
-            found = extract_decisions_from_text(
-                commit.message,
-                source=DecisionSource.COMMIT,
-                source_ref=ref,
-                timestamp=commit.timestamp,
-                author=commit.author,
-                file_path=path,
-            )
+            found: list[Decision] = []
             subject = decision_from_commit_subject(
                 commit.message,
                 source_ref=ref,
@@ -100,11 +93,19 @@ def extract_from_commits(
                     file_path=path,
                 )
                 if extra:
+                    extra.tier = _llm_tier(extra)
                     found.append(extra)
             out.extend(found)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Decision extract failed for %s: %s", commit.sha, exc)
     return out
+
+
+def _llm_tier(decision: Decision) -> DecisionTier:
+    """LLM output is only a decision when it states a reason."""
+    from codegraph.decisions.extractor import classify_tier
+
+    return classify_tier(decision.content, decision.reason, decision.alternatives)
 
 
 def _has_rationale(message: str) -> bool:
@@ -128,7 +129,10 @@ def extract_from_adrs(repo_path: Path) -> list[Decision]:
             logger.warning("Cannot read ADR %s: %s", path, exc)
             continue
         sections = parse_adr_markdown(text)
-        rel = path.as_posix()
+        try:
+            rel = path.relative_to(repo_path).as_posix()
+        except ValueError:
+            rel = path.as_posix()
         decision = decision_from_adr_sections(
             sections,
             source_ref=f"ADR {path.stem}",
@@ -168,9 +172,23 @@ def extract_from_changelog(repo_path: Path) -> list[Decision]:
             source_ref=f"CHANGELOG · {section}",
             timestamp=_file_time(path),
             file_path="CHANGELOG.md",
+            confidence=0.6,
         )
         out.extend(found)
     return out
+
+
+def _dedupe_key(decision: Decision) -> tuple[str, str]:
+    """Key used to collapse the same content extracted by several rules."""
+    normalized = " ".join((decision.content or "").split()).lower()
+    return (decision.source_ref, normalized)
+
+
+def _prefer(a: Decision, b: Decision) -> Decision:
+    """Keep the richer of two records for the same source and content."""
+    if (a.tier is DecisionTier.DECISION) != (b.tier is DecisionTier.DECISION):
+        return a if a.tier is DecisionTier.DECISION else b
+    return a if a.confidence >= b.confidence else b
 
 
 def extract_all(
@@ -179,17 +197,26 @@ def extract_all(
     use_llm: bool = False,
     llm_model: str = "llama3.2",
 ) -> list[Decision]:
-    """Extract decisions from all supported sources and de-duplicate by uid."""
+    """Extract records from all supported sources.
+
+    Records are de-duplicated twice: by uid, and by (source_ref, content) so the
+    same sentence cannot enter twice through different rules.
+    """
     merged: dict[str, Decision] = {}
-    for item in extract_from_commits(
-        repo_path, depth=depth, use_llm=use_llm, llm_model=llm_model
+    by_key: dict[tuple[str, str], Decision] = {}
+    for source_items in (
+        extract_from_commits(repo_path, depth=depth, use_llm=use_llm, llm_model=llm_model),
+        extract_from_adrs(repo_path),
+        extract_from_changelog(repo_path),
     ):
-        merged.setdefault(item.uid, item)
-    for item in extract_from_adrs(repo_path):
-        merged.setdefault(item.uid, item)
-    for item in extract_from_changelog(repo_path):
-        merged.setdefault(item.uid, item)
-    return list(merged.values())
+        for item in source_items:
+            merged.setdefault(item.uid, item)
+            key = _dedupe_key(item)
+            existing = by_key.get(key)
+            by_key[key] = item if existing is None else _prefer(existing, item)
+
+    keep = {id(d) for d in by_key.values()}
+    return [d for d in merged.values() if id(d) in keep]
 
 
 def _file_time(path: Path) -> datetime:

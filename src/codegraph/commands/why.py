@@ -19,9 +19,11 @@ from codegraph.models import (
     Decision,
     DecisionSource,
     DecisionStatus,
+    DecisionTier,
     find_decisions_for_file,
     find_decisions_for_location,
     normalize_location_path,
+    select_decisions,
 )
 from codegraph.storage import (
     connect,
@@ -169,6 +171,7 @@ def decision_from_dgraph(raw: dict) -> Decision:
     """Convert a Dgraph Decision dict into the pydantic model."""
     status = str(raw.get("status") or "accepted")
     source = str(raw.get("source") or "adr")
+    tier = str(raw.get("tier") or DecisionTier.DECISION.value)
     return Decision(
         uid=str(raw.get("uid") or raw.get("decision_uid") or "dec"),
         content=str(raw.get("content") or ""),
@@ -187,6 +190,10 @@ def decision_from_dgraph(raw: dict) -> Decision:
         line=int(raw["line"]) if raw.get("line") is not None else None,
         constraints=list(raw.get("constraints") or []),
         confidence=float(raw.get("confidence") or 0.8),
+        category=str(raw.get("category") or "design"),
+        tier=DecisionTier(tier)
+        if tier in DecisionTier._value2member_map_
+        else DecisionTier.DECISION,
     )
 
 
@@ -293,10 +300,26 @@ def render_decision_card(
         console.print(panel)
 
 
-def render_not_found(file_path: str, line: int | None = None) -> None:
-    """Render the empty-result hint."""
+def render_not_found(
+    file_path: str, line: int | None = None, hidden_records: int = 0
+) -> None:
+    """Render the empty-result hint.
+
+    Args:
+        file_path: Queried file.
+        line: Queried line, when known.
+        hidden_records: Records that exist but were filtered out by the tier
+            and category defaults.
+    """
     location = f"{file_path}:{line}" if line is not None else file_path
     console.print("[bold yellow]No decision record found[/]")
+    if hidden_records:
+        console.print(
+            f"[dim]{hidden_records} history record(s) exist for {location} "
+            "but are not decisions.[/]"
+        )
+        console.print("[dim]  Add --include-events (and --include-dependency) to see them.[/]")
+        return
     console.print(f"[dim]No Decision bound to {location}. Try:[/]")
     console.print("[dim]  codegraph index <repo> --depth 50   # build the graph first[/]")
     console.print("[dim]  codegraph decisions --file <path> --timeline[/]")
@@ -371,7 +394,16 @@ def why_command(
         "--json",
         help="Emit machine-readable JSON instead of Rich cards",
     ),
-    include_dependency: bool = typer.Option(False, "--include-dependency", help="Include dependency-bump decisions"),
+    include_dependency: bool = typer.Option(
+        False,
+        "--include-dependency",
+        help="Include dependency-bump decisions (hidden by default)",
+    ),
+    include_events: bool = typer.Option(
+        False,
+        "--include-events",
+        help="Include event records (plain history: commit subjects, changelog lines)",
+    ),
 ) -> None:
     """Query decision cards for a source location.
 
@@ -399,17 +431,22 @@ def why_command(
             console.print(f"[bold red]Invalid argument[/] {msg}")
         raise typer.Exit(code=2)
 
+    hidden_records = 0
     if backend == "dgraph":
         node = load_code_node_dgraph(file_path, line)
         decisions = _load_decisions_dgraph(file_path, line)
         level = "line"
     else:
         node = load_code_node_sqlite(file_path, line)
-        decisions, level = load_decisions_sqlite(
+        raw_decisions, level = load_decisions_sqlite(
             file_path, line, commit_sha=node.commit_sha if node else ""
         )
-        if not include_dependency:
-            decisions = [d for d in decisions if getattr(d, "category", "design") != "dependency"]
+        decisions = select_decisions(
+            raw_decisions,
+            include_events=include_events,
+            include_dependency=include_dependency,
+        )
+        hidden_records = max(len(raw_decisions) - len(decisions), 0)
 
     if as_json:
         payload = {
@@ -440,8 +477,15 @@ def why_command(
         except Exception:  # noqa: BLE001
             near = []
         if near:
-            decisions = near
-            level = "line"
+            near_visible = select_decisions(
+                near,
+                include_events=include_events,
+                include_dependency=include_dependency,
+            )
+            hidden_records += len(near) - len(near_visible)
+            if near_visible:
+                decisions = near_visible
+                level = "line"
 
     if node is not None:
         render_code_node_header(node)
@@ -452,7 +496,7 @@ def why_command(
         )
 
     if not decisions:
-        render_not_found(file_path, line)
+        render_not_found(file_path, line, hidden_records=hidden_records)
         raise typer.Exit(code=1)
 
     render_decision_card(file_path, line, decisions, level=level)
@@ -490,6 +534,8 @@ def _decision_payload(decision: Decision) -> dict:
         "line": decision.line,
         "constraints": decision.constraints,
         "confidence": decision.confidence,
+        "category": decision.category,
+        "tier": decision.tier.value,
     }
 
 
@@ -501,6 +547,11 @@ def decisions_command(
         "--include-dependency",
         help="Include dependency-bump decisions (hidden by default)",
     ),
+    include_events: bool = typer.Option(
+        False,
+        "--include-events",
+        help="Include event records (plain history: commit subjects, changelog lines)",
+    ),
 ) -> None:
     """List the decision evolution timeline for a file.
 
@@ -508,6 +559,7 @@ def decisions_command(
         file: Target file path.
         timeline: Emit oldest-first when true.
         include_dependency: Show dependency-bump decisions too.
+        include_events: Show event-tier records too.
     """
     rows, _level = load_decisions_sqlite(file, 0)
     if not rows:
@@ -526,16 +578,21 @@ def decisions_command(
             finally:
                 conn.close()
     rows = specific or rows
-    if not include_dependency:
-        rows = [d for d in rows if getattr(d, "category", "design") != "dependency"]
-    if not rows:
-        render_not_found(file)
+    filtered = select_decisions(
+        rows,
+        include_events=include_events,
+        include_dependency=include_dependency,
+    )
+    if not filtered:
+        render_not_found(file, hidden_records=max(len(rows) - len(filtered), 0))
         raise typer.Exit(code=1)
+    rows = filtered
 
     table = Table(title=f"Decision evolution · {file}")
     table.add_column("Date", style="cyan")
     table.add_column("Status")
     table.add_column("Decision", overflow="fold")
+    table.add_column("Kind", style="dim")
     table.add_column("Source", style="dim")
     ordered = list(rows) if timeline else list(reversed(rows))
     for decision in ordered[:15]:
@@ -543,6 +600,7 @@ def decisions_command(
             decision.timestamp.date().isoformat(),
             decision.status.value,
             decision.content,
+            decision.tier.value,
             decision.source_ref,
         )
     console.print(table)

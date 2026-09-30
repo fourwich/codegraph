@@ -7,7 +7,7 @@
 
 终端演示：
 ```bash
-git blame src/auth/session.ts | sed -n '40,45p'
+git blame src/codegraph/storage.py | sed -n '195,200p'
 ```
 
 ---
@@ -15,13 +15,16 @@ git blame src/auth/session.ts | sed -n '40,45p'
 ## 10-25 秒：运行 codegraph why
 
 旁白：
-> 「CodeGraph 能直接回答：这行代码背后的设计决策是什么。」
+> 「CodeGraph 能直接回答：这行代码背后的设计决策是什么，以及当时否决了哪些方案。」
 
 ```bash
-codegraph why src/auth/session.ts:42
+codegraph index . --depth 50
+codegraph why docs/adr/001-use-sqlite-default.md:1
 ```
 
-展示输出：决策卡片（摘要 / 原因 / 备选 / 来源 / 约束 / 可信度）。
+展示输出：决策卡片（决策 / 原因 / 备选 / 来源 / 状态 / 可信度）。
+该仓库自己没有把 ADR 绑定到代码行，所以这里用 ADR 文件本身作为位置；
+查询 `src/` 下的行会明确返回「No decision record found」，而不是猜一个。
 
 ---
 
@@ -31,24 +34,25 @@ codegraph why src/auth/session.ts:42
 > 「还能按历史时刻查看当时的代码图。」
 
 ```bash
-codegraph graph --at 2024-11-02 --scope src
+codegraph graph --at 2026-09-23 --scope src
+codegraph graph --at 2026-09-28 --scope src
 ```
 
-展示：节点数、边数、变更摘要。
+展示：节点数、边数、变更摘要（本仓库 2026-09-23 / 2026-09-28 两次快照）。
 
 ---
 
 ## 40-55 秒：展示 Web 可视化
 
 旁白：
-> 「决策和代码在一张图上，关联可多跳查询。」
+> 「决策和代码在一张图上，可以按时间回放。」
 
 ```bash
-codegraph serve
-# 打开 http://localhost:3000
+codegraph serve --port 8080
+# 打开 http://127.0.0.1:8080/
 ```
 
-展示：决策图谱（CodeNode 节点 + Decision 琥珀色卡片 + Git 时间轴）。
+展示：决策图谱（CodeNode 节点 + Decision 卡片 + Git 时间轴）。
 
 ---
 
@@ -76,6 +80,11 @@ terminalizer render codegraph-demo
 
 ## 演示用示例仓库
 
-- 路径：`examples/demo_repo`
-- 关键文件：`src/auth/session.ts:42`
-- 预置决策：PR #48 / Issue #31 / ADR-003（有状态 JWT + 黑名单）
+本脚本直接在本仓库上演示（`codegraph index . --depth 50`）：
+
+- 决策示例：`docs/adr/001-use-sqlite-default.md`（含原因与两个被否决方案）
+- 变更时间线：`codegraph decisions --file CHANGELOG.md --timeline`
+- 历史快照：`codegraph graph --at 2026-09-23 --scope src`
+
+`src/auth/session.ts` 与 `examples/demo_repo` 是早期版本留下的占位示例，
+仓库里并不存在，不要出现在录屏里。

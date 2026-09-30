@@ -1,4 +1,4 @@
-﻿"""codegraph conflicts: detect contradictory accepted decisions."""
+"""codegraph conflicts: detect contradictory accepted decisions."""
 
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ from rich.console import Console
 from rich.table import Table
 
 from codegraph.decisions.conflicts import detect_all
-from codegraph.models import Decision, Conflict, DecisionStatus, normalize_location_path
+from codegraph.models import (
+    Decision,
+    Conflict,
+    DecisionStatus,
+    normalize_location_path,
+    select_decisions,
+)
 from codegraph.storage import connect, db_path_for_root, query_all_decisions
 
 console = Console()
@@ -37,8 +43,18 @@ def filter_scope(decisions: list[Decision], scope: str) -> list[Decision]:
     return out
 
 
-def load_decisions(backend: str) -> list[Decision]:
-    """Load decisions from SQLite or Dgraph."""
+def load_decisions(backend: str, *, include_events: bool = False) -> list[Decision]:
+    """Load records from SQLite or Dgraph, decisions only by default.
+
+    Detecting contradictions between commit subjects is noise, so event-tier
+    records are skipped unless explicitly requested.
+    """
+    decisions = _load_all(backend)
+    return select_decisions(decisions, include_events=include_events)
+
+
+def _load_all(backend: str) -> list[Decision]:
+    """Load every record from the requested backend."""
     if backend == "dgraph":
         from codegraph.commands.why import decision_from_dgraph
         from codegraph.graph import DgraphClient, DgraphConnectionError

@@ -1,6 +1,6 @@
-﻿# CodeGraph
+# CodeGraph
 
-![tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-100%20passing-brightgreen)
 [![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
 [![Downloads](https://img.shields.io/pypi/dm/codegraphx)](https://pypi.org/project/codegraphx/)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
@@ -9,11 +9,11 @@
 
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
 
-Why not just ask an AI? Because AI cannot read a closed issue from two years ago. CodeGraph can.
+Why not just ask an AI? Because AI cannot read a closed issue from two years ago — and because a commit subject is not an answer. CodeGraph shows a decision card only when the record states a reason or a rejected alternative; everything else is kept as history you can ask for explicitly. On Express.js that means **5 decisions out of 204 records**, not 174 "decisions" that were mostly version bumps.
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph · 100 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -22,19 +22,20 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 
 See [benchmarks](docs/benchmarks.md) for real-project attempts and synthetic performance numbers.
 See [case study on Express.js](docs/case-study.md) for real-world results after JavaScript support.
+See [decision extraction](docs/extraction-recall.md) for how `decision` and `event` records are separated, and how to reproduce the precision numbers.
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (75 tests passing).
+Verified with `pytest -q` and `codegraph --help` (100 tests passing).
 
 - [x] Product site (HTML / CSS / JS)
-- [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve`)
+- [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`)
 - [x] tree-sitter parsing (7 languages)
 - [x] SQLite storage
 - [x] Real Git history traversal
-- [x] Decision extraction from commits, ADRs, CHANGELOG
+- [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 75 tests passing
+- [x] 100 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
@@ -54,11 +55,11 @@ Verified with `pytest -q` and `codegraph --help` (75 tests passing).
 
 ## Quick start
 
-`ash
+```bash
 pip install codegraphx
 codegraph index .
 codegraph why src/main.py:42
-`
+```
 
 Or from source:
 
@@ -78,14 +79,18 @@ python -m venv .venv
 ```bash
 codegraph --help
 codegraph index . [--depth N] [--backend sqlite|dgraph] [--use-llm] [--json]
-codegraph why src/auth/session.ts:42 [--json]
-codegraph graph --at 2024-11-02 --scope src
-codegraph decisions --file src/auth/session.ts --timeline
+codegraph why docs/adr/001-use-sqlite-default.md:1 [--json] [--include-events]
+codegraph graph --at 2026-09-23 --scope src
+codegraph decisions --file CHANGELOG.md --timeline [--include-events]
 codegraph diff 2026-09-23 2026-09-24 --scope src
 codegraph conflicts --scope src   # opposite / supersede / temporal
 codegraph export --for-ai --scope src
 codegraph serve --port 8080
 ```
+
+`why` answers about a code location; a decision that is only bound at file level
+says so, and a location with no decision says so instead of guessing. Add
+`--include-events` to see the commit history behind a line.
 
 ## Tech stack
 
@@ -121,7 +126,7 @@ docker compose up -d
 .venv\Scripts\codegraph.exe index . --backend dgraph
 
 # 3) Same commands accept --backend dgraph
-.venv\Scripts\codegraph.exe why src/auth/session.ts:42 --backend dgraph
+.venv\Scripts\codegraph.exe why docs/adr/001-use-sqlite-default.md:1 --backend dgraph
 .venv\Scripts\codegraph.exe graph --at 2024-11-02 --backend dgraph
 .venv\Scripts\codegraph.exe conflicts --scope src --backend dgraph
 .venv\Scripts\codegraph.exe export --for-ai --scope src --backend dgraph

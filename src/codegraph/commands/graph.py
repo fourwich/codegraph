@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from codegraph.models import SAMPLE_DECISIONS, CodeNode, Decision
+from codegraph.models import SAMPLE_DECISIONS, CodeNode, Decision, select_decisions
 from codegraph.storage import (
     connect,
     count_edges_at,
@@ -85,7 +85,7 @@ def _load_decisions(conn, scope: str) -> list[Decision]:
     """Load decisions from DB, optionally filtered by scope prefix."""
     from codegraph.storage import query_all_decisions
 
-    rows = query_all_decisions(conn)
+    rows = select_decisions(query_all_decisions(conn))
     prefix = (scope or "").replace("\\", "/").rstrip("/")
     if prefix and prefix != ".":
         rows = [d for d in rows if d.file_path.startswith(prefix)]

@@ -17,7 +17,7 @@ of code to the design decisions that shaped it.
 
 1. **Structure** — tree-sitter parses TypeScript/Python into AST nodes and edges (`uses` / `defined_by` / `contains`)
 2. **Time** — Every node carries `valid_from` / `valid_to`, derived from real Git history
-3. **Decisions** — Extracted from commit messages, ADRs, and CHANGELOG, linked to the exact code lines they justify
+3. **Decisions** — Extracted from commit messages, ADRs, and CHANGELOG, linked to code lines where a real diff overlap exists. Every record carries a **tier**: `decision` (it states a reason or a rejected alternative) or `event` (plain history). Only decisions are shown by default.
 
 ---
 
@@ -42,11 +42,16 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 - **CodeNode** — `uid, kind, name, file_path, line_start, line_end, language, valid_from, valid_to, parent_uid`
 - **Edge** — `from_uid, to_uid, kind` (`uses` / `defined_by` / `contains`)
 - **decision_code_links** — decision_uid / node_uid / file_path / line / commit_sha
-- **Decision** — `content, reason, alternatives, status, source, source_ref, timestamp, author, constraints, confidence`
+- **Decision** — `content, reason, alternatives, status, source, source_ref, timestamp, author, constraints, confidence, category, tier`
+
+`tier` separates records that carry a rationale (`decision`) from plain history
+(`event`). `why`, `decisions`, `conflicts`, `export`, `graph` and the web API show
+decisions only; `--include-events` adds history, `--include-dependency` adds
+dependency records.
 
 ---
 
-## Seven commands
+## Eight commands
 
 | Command | Purpose |
 |---|---|
@@ -57,6 +62,7 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 | `codegraph conflicts` | Detect contradictory decisions |
 | `codegraph export --for-ai` | Export AI agent context |
 | `codegraph serve` | Local web visualization |
+| `codegraph diff <from> <to>` | Decision changes between two versions |
 
 ---
 
@@ -81,12 +87,12 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 |---|---|
 | ✅ Done | Product site (HTML / CSS / JS) |
 | ✅ Done | CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`) |
-| ✅ Done | tree-sitter parsing for TypeScript, Python, Java, Go, Rust, C++ |
+| ✅ Done | tree-sitter parsing for TypeScript, JavaScript, Python, Java, Go, Rust, C++ |
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
-| ✅ Done | Decision extraction from commits, ADRs, CHANGELOG |
+| ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 75 tests passing (`pytest -q`) |
+| ✅ Done | 100 tests passing (`pytest -q`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |
 | ✅ Done | Optional Ollama LLM extraction hook (`--use-llm`) |

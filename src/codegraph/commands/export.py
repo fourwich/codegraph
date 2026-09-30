@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from codegraph.models import Decision, normalize_location_path
+from codegraph.models import Decision, normalize_location_path, select_decisions
 from codegraph.storage import (
     connect,
     db_path_for_root,
@@ -34,7 +34,7 @@ def load_context_data(
     try:
         nodes = query_nodes_at(conn, now, scope)
         prefix = normalize_location_path(scope)
-        decisions = query_all_decisions(conn)
+        decisions = select_decisions(query_all_decisions(conn))
         if prefix and prefix != ".":
             decisions = [d for d in decisions if (d.file_path or "").startswith(prefix)]
         return nodes, decisions
@@ -63,7 +63,7 @@ def _load_dgraph(scope: str) -> tuple[list, list[Decision]]:
         raise typer.Exit(code=3) from exc
 
     nodes = payload.get("nodes") or []
-    decisions = [decision_from_dgraph(item) for item in raw_decisions]
+    decisions = select_decisions([decision_from_dgraph(item) for item in raw_decisions])
     return nodes, decisions
 
 

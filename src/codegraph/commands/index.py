@@ -99,6 +99,11 @@ def _node_source(text: str, node: CodeNode) -> str:
     return "\n".join(lines[node.line_start - 1 : node.line_end])
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Return a timezone-aware datetime so versions can be compared."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
 def _has_unchanged_live_version(
     versions: list[CodeNode],
     node: CodeNode,
@@ -106,17 +111,27 @@ def _has_unchanged_live_version(
     history,
     rel_path: str,
     text_cache: dict[tuple[str, str], str],
+    commit_timestamp: datetime | None = None,
 ) -> bool:
-    """True when an equivalent live version of this symbol already exists.
+    """True when this commit must not open a new version of the symbol.
 
-    Two versions count as equivalent only when they cover the same line range
-    *and* the same source text. That keeps exactly one live version per symbol
-    (no double counting in `graph --at`) without dropping real edits whose line
-    range happened to stay the same.
+    Two cases:
+
+    * a live version already covers the same range *and* the same source text, so
+      the symbol did not change;
+    * a live version was created by a **later** commit. This happens when history
+      is re-read after an amend, rebase or reset, and the stored graph is already
+      newer than the commit being ingested. Opening a version for the older
+      commit would close the newer one at an earlier instant and invert the
+      timeline.
     """
     for prev in versions:
         if prev.valid_to is not None:
             continue
+        if commit_timestamp is not None and _as_utc(prev.valid_from) > _as_utc(
+            commit_timestamp
+        ):
+            return True
         if prev.line_start != node.line_start or prev.line_end != node.line_end:
             continue
         if prev.commit_sha == node.commit_sha:
@@ -182,7 +197,7 @@ def ingest_commit(
         for node in nodes:
             key = (node.file_path, node.name)
             if _has_unchanged_live_version(
-                live.get(key, []), node, text, history, rel_n, cache
+                live.get(key, []), node, text, history, rel_n, cache, commit.timestamp
             ):
                 # Same symbol, same lines, same source: keep the existing version
                 # instead of forking a second live version.
@@ -450,11 +465,19 @@ def write_sqlite_graph(
         else:
             replace_graph_rows(conn, [n.uid for n in nodes])
         node_uids = {n.uid for n in nodes}
-        live_edges = [e for e in edges if e.from_uid in node_uids and e.to_uid in node_uids]
+        candidates = [e for e in edges if e.from_uid in node_uids and e.to_uid in node_uids]
+        # Writing must be idempotent: re-reading history after an amend or rebase
+        # re-derives edges that are already stored.
+        unique_keys = dict.fromkeys(
+            (e.from_uid, e.to_uid, e.kind, e.file_path, e.line) for e in candidates
+        )
+        live_edges = [
+            Edge(from_uid=from_uid, to_uid=to_uid, kind=kind, file_path=path, line=line)
+            for from_uid, to_uid, kind, path, line in unique_keys
+        ]
         if len(live_edges) != len(edges):
             logger.debug(
-                "Dropped %d edge(s) whose endpoints are not stored nodes",
-                len(edges) - len(live_edges),
+                "Dropped %d duplicate or dangling edge(s)", len(edges) - len(live_edges)
             )
         insert_nodes(conn, nodes)
         insert_edges(conn, live_edges)

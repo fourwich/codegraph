@@ -6,30 +6,32 @@ import hashlib
 import re
 from datetime import datetime
 
-from codegraph.models import Decision, DecisionSource, DecisionStatus, make_uid
+from codegraph.models import (
+    Decision,
+    DecisionSource,
+    DecisionStatus,
+    DecisionTier,
+    make_uid,
+)
 
-# Keywords that signal a design rationale in prose
+# Keywords that signal a design rationale in prose. Deliberately narrow: a word
+# like "since"/"must be"/"to support" matches ordinary English and used to turn
+# release notes into "decisions".
 DECISION_KEYWORDS: tuple[str, ...] = (
     "because",
-    "since",
-    "reason",
-    "avoid",
     "tradeoff",
     "trade-off",
     "instead of",
+    "rather than",
     "chose",
-    "chose to",
     "we chose",
     "we picked",
     "we decided",
     "decided",
     "so that",
     "in order to",
-    "rather than",
     "switched to",
     "migrated to",
-    "moved to",
-    "replaced",
     "for performance",
     "for security",
     "for simplicity",
@@ -43,24 +45,45 @@ DECISION_KEYWORDS: tuple[str, ...] = (
     "because of",
     "as a result of",
     "opted for",
-    "preferred",
+    "in favor of",
     "to reduce",
     "to avoid",
     "to prevent",
     "to simplify",
-    "to improve",
     "to fix",
     "to resolve",
-    "to support",
-    "to keep",
-    "to match",
-    "in favor of",
     "resolves",
-    "must be",
-    "should not",
+)
+
+# Clause markers that introduce the *reason* half of a decision.
+_REASON_MARKERS: tuple[str, ...] = (
+    " because ",
+    " so that ",
+    " in order to ",
+    " due to ",
+    " because of ",
+    " as a result of ",
+    " to fix ",
+    " to avoid ",
+    " to prevent ",
+    " to reduce ",
+    " to simplify ",
+    " for performance ",
+    " for security ",
+    " for simplicity ",
+    " for compatibility ",
+    " for reliability ",
+)
+
+# Clause markers that introduce a *rejected alternative*.
+_ALT_MARKERS: tuple[str, ...] = (
+    " instead of ",
+    " rather than ",
+    " in favor of ",
 )
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_BULLET_PREFIX = re.compile(r"^\s*[-*+]\s+")
 _WORD = re.compile(r"[A-Za-z][A-Za-z0-9_\-]*")
 
 CONVENTIONAL_COMMIT = re.compile(
@@ -72,9 +95,9 @@ BULLET_RE = re.compile(r"^\s*[-*+]\s+(?P<text>.+)$", re.MULTILINE)
 
 
 def split_sentences(text: str) -> list[str]:
-    """Split text into sentence-like fragments."""
-    parts = [p.strip() for p in _SENTENCE_SPLIT.split(text) if p and p.strip()]
-    return parts
+    """Split text into sentence-like fragments, dropping list markers."""
+    parts = [_BULLET_PREFIX.sub("", p).strip() for p in _SENTENCE_SPLIT.split(text)]
+    return [p for p in parts if p]
 
 
 def split_commit_parts(message: str) -> tuple[str, list[str]]:
@@ -100,16 +123,7 @@ def split_content_reason(sentence: str) -> tuple[str, str]:
     """Split a rationale sentence into (content, reason)."""
     text = " ".join(sentence.strip().split())
     lower = text.lower()
-    for marker in (
-        " because ",
-        " since ",
-        " so that ",
-        " in order to ",
-        " rather than ",
-        " due to ",
-        " because of ",
-        " as a result of ",
-    ):
+    for marker in _REASON_MARKERS:
         idx = lower.find(marker)
         if idx > 0:
             left = text[:idx].strip().rstrip(",;:")
@@ -117,6 +131,38 @@ def split_content_reason(sentence: str) -> tuple[str, str]:
             if left:
                 return left[:220], right[:500]
     return text[:220], ""
+
+
+def split_decision_parts(sentence: str) -> tuple[str, str, list[str]]:
+    """Split one sentence into (content, reason, alternatives).
+
+    "use node:buffer instead of safe-buffer" yields content "use node:buffer"
+    and alternatives ["safe-buffer"]; a "because ..." clause becomes the reason.
+    A clause is only read as an alternative when the sentence looks complete —
+    a fragment cut mid-phrase ("... upsert instead of calling") would otherwise
+    produce a meaningless alternative.
+    """
+    text = " ".join((sentence or "").strip().split())
+    alternatives: list[str] = []
+    complete = text.endswith((".", ")", "`", "!", "?"))
+    lower = text.lower()
+    for marker in _ALT_MARKERS:
+        idx = lower.find(marker)
+        if idx > 0 and complete:
+            alternative = text[idx + len(marker) :].strip().rstrip(".")
+            if len(alternative.split()) >= 1:
+                alternatives.append(alternative[:180])
+            text = text[:idx].strip().rstrip(",;:")
+            break
+    content, reason = split_content_reason(text)
+    return content, reason, alternatives
+
+
+def classify_tier(content: str, reason: str, alternatives: list[str]) -> DecisionTier:
+    """A record is a decision only when it states why or what it rejected."""
+    if (reason or "").strip() or alternatives:
+        return DecisionTier.DECISION
+    return DecisionTier.EVENT
 
 
 def content_fingerprint(text: str) -> str:
@@ -140,9 +186,16 @@ def decision_from_sentence(
     line: int | None = None,
     uid_prefix: str = "dec",
     confidence: float = 0.55,
+    category: str = "design",
+    tier: DecisionTier | None = None,
 ) -> Decision:
-    """Build a Decision from one rationale sentence."""
-    content, reason = split_content_reason(sentence)
+    """Build a Decision from one sentence.
+
+    Args:
+        tier: Force a tier; when omitted it is derived from the sentence
+            (reason or rejected alternative => decision, otherwise event).
+    """
+    content, reason, alternatives = split_decision_parts(sentence)
     if len(content) > 220:
         content = content[:217] + "..."
     uid = make_uid(file_path or source_ref, "decision", uid_prefix, max(line or 1, 1))
@@ -151,7 +204,7 @@ def decision_from_sentence(
         uid=uid,
         content=content,
         reason=reason,
-        alternatives=[],
+        alternatives=alternatives,
         status=DecisionStatus.ACCEPTED,
         source=source,
         source_ref=source_ref,
@@ -161,6 +214,8 @@ def decision_from_sentence(
         line=line,
         constraints=[],
         confidence=confidence,
+        category=category,
+        tier=tier or classify_tier(content, reason, alternatives),
     )
 
 
@@ -172,16 +227,28 @@ def decision_from_commit_subject(
     author: str = "",
     file_path: str = "",
 ) -> Decision | None:
-    """Build a weak Decision from a conventional commit subject line."""
+    """Build one record from a commit subject line.
+
+    Every commit subject becomes a record. It is a *decision* only when the
+    subject itself states a reason or a rejected alternative — or when it is a
+    dependency bump that says why (for example "to fix CVE-2026-12590").
+    """
     subject, _body = split_commit_parts(message)
-    match = CONVENTIONAL_COMMIT.match(subject)
-    if not match:
+    if not subject:
         return None
-    subject_text = match.group("subject").strip()
+    match = CONVENTIONAL_COMMIT.match(subject)
+    subject_text = match.group("subject").strip() if match else subject.strip()
     if not subject_text:
         return None
+
     dep = is_dependency_commit(subject) or is_dependency_commit(subject_text)
-    decision = decision_from_sentence(
+    content, reason, alternatives = split_decision_parts(subject_text)
+    tier = classify_tier(content, reason, alternatives)
+    if tier is DecisionTier.DECISION:
+        confidence = 0.65 if dep else 0.6
+    else:
+        confidence = 0.5
+    return decision_from_sentence(
         subject_text,
         source=DecisionSource.COMMIT,
         source_ref=source_ref,
@@ -189,11 +256,10 @@ def decision_from_commit_subject(
         author=author,
         file_path=file_path,
         uid_prefix="commit-subject",
-        confidence=0.5 if dep else 0.55,
+        confidence=confidence,
+        category="dependency" if dep else "design",
+        tier=tier,
     )
-    if dep:
-        decision.category = "dependency"
-    return decision
 
 
 def decisions_from_commit_body(
@@ -204,12 +270,18 @@ def decisions_from_commit_body(
     author: str = "",
     file_path: str = "",
 ) -> list[Decision]:
-    """Extract decisions from commit body bullets / paragraphs."""
+    """Extract records from commit body bullets / paragraphs.
+
+    A bullet becomes a decision only when it carries a reason or a rejected
+    alternative; otherwise it is kept as a low-confidence event.
+    """
     _subject, parts = split_commit_parts(message)
     out: list[Decision] = []
     for part in parts:
         if not looks_like_decision(part):
             continue
+        content, reason, alternatives = split_decision_parts(part)
+        tier = classify_tier(content, reason, alternatives)
         out.append(
             decision_from_sentence(
                 part,
@@ -219,7 +291,8 @@ def decisions_from_commit_body(
                 author=author,
                 file_path=file_path,
                 uid_prefix="commit-body",
-                confidence=0.7,
+                confidence=0.7 if tier is DecisionTier.DECISION else 0.55,
+                tier=tier,
             )
         )
     return out
@@ -234,8 +307,15 @@ def extract_decisions_from_text(
     author: str = "",
     file_path: str = "",
     confidence: float = 0.55,
+    category: str = "design",
+    tier: DecisionTier | None = None,
 ) -> list[Decision]:
-    """Extract decision-like sentences from free text."""
+    """Extract decision-like sentences from free text.
+
+    Args:
+        tier: Force the tier for every hit; when omitted each sentence is
+            classified on its own (reason/alternative => decision).
+    """
     found: list[Decision] = []
     for sentence in split_sentences(text):
         if not looks_like_decision(sentence):
@@ -250,6 +330,8 @@ def extract_decisions_from_text(
                 file_path=file_path,
                 uid_prefix=source.value,
                 confidence=confidence,
+                category=category,
+                tier=tier,
             )
         )
     return found
@@ -335,15 +417,22 @@ def decision_from_adr_sections(
         line=None,
         constraints=constraints,
         confidence=0.8,
+        tier=DecisionTier.DECISION,
     )
 
 
 DEPENDENCY_RE = re.compile(
-    r"^(build\(deps|chore\(deps|bump |update .* to v?\d|dependabot)",
+    r"^(build\(deps|chore\(deps|deps(\([^)]*\))?:|bump |update .* to v?\d|dependabot)",
     re.IGNORECASE,
+)
+
+# "bump qs from 6.5.2 to 6.5.3" / "bump body-parser to ^2.3.0"
+DEPENDENCY_BUMP_RE = re.compile(
+    r"\bbump[s]?\b[^.]*\b(from|to)\b", re.IGNORECASE
 )
 
 
 def is_dependency_commit(text: str) -> bool:
     """Return True when a commit subject looks like a dependency bump."""
-    return bool(DEPENDENCY_RE.match((text or "").strip()))
+    value = (text or "").strip()
+    return bool(DEPENDENCY_RE.match(value) or DEPENDENCY_BUMP_RE.search(value))

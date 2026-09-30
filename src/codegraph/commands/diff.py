@@ -1,4 +1,4 @@
-﻿"""codegraph diff: decision changes between two versions."""
+"""codegraph diff: decision changes between two versions."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from codegraph.git.refs import RefError, resolve_ref
-from codegraph.models import Decision, DecisionChange
+from codegraph.models import Decision, DecisionChange, select_decisions
 from codegraph.storage import connect, db_path_for_root, query_decisions_at
 
 console = Console()
@@ -172,8 +172,8 @@ def diff_command(
 
     conn = connect(db_path)
     try:
-        from_decs = query_decisions_at(conn, from_ts, scope)
-        to_decs = query_decisions_at(conn, to_ts, scope)
+        from_decs = select_decisions(query_decisions_at(conn, from_ts, scope))
+        to_decs = select_decisions(query_decisions_at(conn, to_ts, scope))
     finally:
         conn.close()
 

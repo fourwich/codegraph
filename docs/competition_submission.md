@@ -1,8 +1,8 @@
-﻿# Creator Colosseum — CodeGraph submission copy
+# Creator Colosseum — CodeGraph submission copy
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **75 tests passing** · **8 CLI commands** · **7 languages**
+Verified locally: **100 tests passing** · **8 CLI commands** · **7 languages**
 
 ---
 
@@ -37,12 +37,12 @@ I built CodeGraph in stages so each one stayed runnable.
 
 1. **MVP** — Typer CLI, pydantic models, Rich decision cards, SQLite schema.
 2. **Real Git** — GitPython history walks; every CodeNode version carries `valid_from` / `valid_to`; `graph --at` filters live nodes and live edges.
-3. **Decisions** — rule-based extraction from commit messages, ADR markdown, and CHANGELOG sections (keywords such as *because* / *instead of*), with conventional-commit subjects as weak evidence.
+3. **Decisions** — rule-based extraction from commit messages, ADR markdown, and CHANGELOG sections (keywords such as *because* / *instead of*), graded into `decision` and `event` tiers so a commit subject is never presented as a design rationale.
 4. **Multi-language** — tree-sitter parsers for TypeScript/JavaScript, Python, Java, Go, Rust, and C++ behind one registry.
 5. **Web + export** — `codegraph serve` (FastAPI + Cytoscape) and `codegraph export --for-ai` context packs for coding agents.
 6. **Editor + LLM** — VSCode “Show decision” using JSON output; optional Ollama extraction (`--use-llm`) that degrades to rules when offline.
 
-Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **49 passing tests**. The CLI exposes **seven commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, and `serve`.
+Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **100 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
 
 ### Challenges I faced
 
@@ -52,7 +52,7 @@ Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD 
 
 **Dgraph upserts.** Business keys (`node_uid`) must map onto blank nodes and `uid(var)` updates without duplicating history versions. Live clusters are optional; the client and `--backend dgraph` exist, but production hardening is still open.
 
-**Noise in decision extraction.** Rules first; LLM only when a commit lacks rationale keywords, and LLM confidence is capped at 0.7 so it cannot outrank explicit reasoning. When Ollama is offline the CLI warns and continues — never fail the whole index.
+**Noise in decision extraction.** Rules first; LLM only when a commit lacks rationale keywords, and LLM confidence is capped at 0.7 so it cannot outrank explicit reasoning. When Ollama is offline the CLI warns and continues — never fail the whole index. Every record is also graded: only records that state a reason or a rejected alternative are shown as decisions; commit subjects stay as `event` history. On Express.js that is **5 decisions out of 204 records** — a small, checkable number instead of an inflated one.
 
 ### Why not just ask an AI?
 
@@ -84,7 +84,7 @@ Dgraph is a distributed native graph with DQL and upsert blocks, and it matches 
 Every CodeNode version stores `valid_from` / `valid_to` from Git commits. `graph --at DATE` keeps nodes where `valid_from <= DATE` and `valid_to` is null or `>= DATE`. Edges count only when both endpoints are live at that date.
 
 **3. How do you keep decision extraction accurate?**  
-Rules first: rationale keywords in commit messages, ADR headings, CHANGELOG Changed/Removed sections, plus conventional-commit subjects as weak evidence. Optional Ollama fills gaps only when rules find nothing, with confidence capped at 0.7.
+Rules first: rationale keywords in commit messages, ADR headings, CHANGELOG Changed/Removed sections. A record is only presented as a decision when it states a reason (`because …`, `to fix …`) or a rejected alternative (`instead of X`); commit subjects and release-note lines are stored as `event` history and hidden unless `--include-events` is passed. Optional Ollama fills gaps only when rules find nothing, with confidence capped at 0.7. Precision is measured, not asserted: `python scripts/eval_decision_precision.py <repo>`.
 
 **4. How do you handle six languages?**  
 One `BaseParser` interface: `parse_text` returns nodes; call sites are recorded then merged into `uses` / `contains` edges. Language files only map AST kinds to function/class/variable — no language logic in storage.
@@ -107,4 +107,4 @@ I would define the SQLite/Dgraph schema for versioned nodes on day one, and add 
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (75 tests, 8 commands, 7 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (100 tests, 8 commands, 7 languages).

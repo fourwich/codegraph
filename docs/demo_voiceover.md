@@ -1,4 +1,4 @@
-﻿# CodeGraph — 60-second demo voiceover (English)
+# CodeGraph — 60-second demo voiceover (English)
 
 Use this as the read-aloud script for the screen recording.
 
@@ -16,13 +16,13 @@ Voiceover: "git blame only shows who touched a line, not why it exists."
 
 [12-24s]
 Screen: run codegraph why
-Command: `codegraph why src/codegraph/cli.py:24`
-Voiceover: "CodeGraph doesn't guess. It reads the actual commit, the actual decision, and shows you where it came from."
+Command: `codegraph why docs/adr/001-use-sqlite-default.md:1`
+Voiceover: "CodeGraph doesn't guess. It shows the actual decision, its reason, and the alternatives that were rejected."
 
 [24-36s]
 Screen: run codegraph graph
-Command: `codegraph graph --at 2026-09-01 --scope src`
-Then: `codegraph graph --at 2026-09-23 --scope src`
+Command: `codegraph graph --at 2026-09-23 --scope src`
+Then: `codegraph graph --at 2026-09-28 --scope src`
 Voiceover: "Time travel shows the graph at a past date — nodes and live edges change."
 
 [36-46s]
@@ -45,7 +45,8 @@ Voiceover: "CodeGraph — the decision memory layer for your codebase."
 ---
 
 ## Word count check
-Target: 130-150 words at ~2.5 words/sec. Trim any line over 15 words before recording.
+Target: 130-150 words at ~2.5 words/sec. The script above is currently ~95 words;
+add one concrete sentence per beat, or slow the read.
 
 ## Recording tips
 - Terminal font large enough for 1080p
