@@ -16,28 +16,40 @@ def state_path(root: Path) -> Path:
     return root / STATE_REL
 
 
-def load_last_head(root: Path) -> str | None:
-    """Return the last indexed HEAD sha, if any."""
+def load_last_state(root: Path) -> dict:
+    """Return the stored incremental state (empty when absent or unreadable)."""
     path = state_path(root)
     if not path.is_file():
-        return None
+        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Cannot read index state: %s", exc)
-        return None
-    value = data.get("head")
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load_last_head(root: Path) -> str | None:
+    """Return the last indexed HEAD sha, if any."""
+    value = load_last_state(root).get("head")
     return str(value) if value else None
 
 
-def save_last_head(root: Path, head_sha: str) -> None:
-    """Persist the HEAD sha that was just indexed."""
+def save_last_head(root: Path, head_sha: str, node_count: int | None = None) -> None:
+    """Persist the HEAD sha that was just indexed.
+
+    Args:
+        root: Repository root.
+        head_sha: Commit sha that was indexed.
+        node_count: Node versions written by this run; lets the next run detect
+            a graph that was truncated behind our back.
+    """
     path = state_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"head": head_sha, "tool": "codegraph"}, indent=2),
-        encoding="utf-8",
-    )
+    payload: dict = {"head": head_sha, "tool": "codegraph"}
+    if node_count is not None:
+        payload["node_count"] = int(node_count)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def commits_after(root: Path, history, depth: int | None = 100) -> list:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,14 +60,25 @@ def parse_location(raw: str) -> tuple[str, int]:
     return normalize_location_path(match.group("file")), line_no
 
 
+def _current_stdout_encodes(text: str) -> bool:
+    """True when the active stdout encoding can represent text."""
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        text.encode(encoding)
+    except (UnicodeEncodeError, LookupError):
+        return False
+    return True
+
+
 def format_status_label(status_value: str) -> str:
-    """Map decision status to a short label."""
+    """Map decision status to a short label, degrading to ASCII when needed."""
     mapping = {
-        "accepted": "✅ active",
-        "superseded": "🔁 superseded",
-        "rejected": "⛔ rejected",
+        "accepted": ("✅ active", "[OK] active"),
+        "superseded": ("🔁 superseded", "[SUPERSEDED]"),
+        "rejected": ("⛔ rejected", "[REJECTED]"),
     }
-    return mapping.get(status_value, status_value)
+    preferred, fallback = mapping.get(status_value, (status_value, status_value))
+    return preferred if _current_stdout_encodes(preferred) else fallback
 
 
 def format_confidence(confidence: float) -> str:
@@ -433,6 +445,11 @@ def why_command(
 
     if node is not None:
         render_code_node_header(node)
+    else:
+        console.print(
+            "[dim]No active code node covers this line "
+            "(the symbol may have moved or been removed).[/]"
+        )
 
     if not decisions:
         render_not_found(file_path, line)
@@ -479,12 +496,18 @@ def _decision_payload(decision: Decision) -> dict:
 def decisions_command(
     file: str = typer.Option(..., "--file", help="File path", metavar="PATH"),
     timeline: bool = typer.Option(False, "--timeline", help="Show oldest-first evolution"),
+    include_dependency: bool = typer.Option(
+        False,
+        "--include-dependency",
+        help="Include dependency-bump decisions (hidden by default)",
+    ),
 ) -> None:
     """List the decision evolution timeline for a file.
 
     Args:
         file: Target file path.
         timeline: Emit oldest-first when true.
+        include_dependency: Show dependency-bump decisions too.
     """
     rows, _level = load_decisions_sqlite(file, 0)
     if not rows:
@@ -503,6 +526,8 @@ def decisions_command(
             finally:
                 conn.close()
     rows = specific or rows
+    if not include_dependency:
+        rows = [d for d in rows if getattr(d, "category", "design") != "dependency"]
     if not rows:
         render_not_found(file)
         raise typer.Exit(code=1)

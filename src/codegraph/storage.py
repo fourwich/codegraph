@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from codegraph.models import CodeNode, Decision, Edge
@@ -115,11 +115,68 @@ def _migrate_nodes(conn: sqlite3.Connection) -> None:
 
 
 def clear_graph(conn: sqlite3.Connection) -> None:
-    """Delete existing graph rows before a full rebuild."""
+    """Delete existing graph rows before a full rebuild.
+
+    Only call this for a full rebuild (`codegraph index --full`, or a first
+    index). Incremental runs must use `replace_graph_rows` so previously
+    indexed history is preserved.
+    """
     conn.execute("DELETE FROM edges")
     conn.execute("DELETE FROM nodes")
     conn.execute("DELETE FROM decisions")
     conn.execute("DELETE FROM decision_code_links")
+    conn.commit()
+
+
+def load_nodes(conn: sqlite3.Connection) -> list[CodeNode]:
+    """Return every stored CodeNode version, oldest first."""
+    rows = conn.execute(
+        "SELECT uid, kind, name, file_path, line_start, line_end, language, parent_uid, "
+        "valid_from, valid_to, commit_sha FROM nodes ORDER BY valid_from"
+    ).fetchall()
+    return [_row_to_node(row) for row in rows]
+
+
+def load_edges(conn: sqlite3.Connection) -> list[Edge]:
+    """Return every stored Edge."""
+    rows = conn.execute(
+        "SELECT from_uid, to_uid, kind, file_path, line FROM edges"
+    ).fetchall()
+    return [
+        Edge(
+            from_uid=str(r[0] or ""),
+            to_uid=str(r[1] or ""),
+            kind=str(r[2] or "uses"),
+            file_path=str(r[3] or ""),
+            line=max(int(r[4] or 1), 1),
+        )
+        for r in rows
+    ]
+
+
+def _chunks(values: list[str], size: int = 500) -> list[list[str]]:
+    """Split a list into chunks small enough for SQLite parameter limits."""
+    return [values[i : i + size] for i in range(0, len(values), size)]
+
+
+def replace_graph_rows(conn: sqlite3.Connection, node_uids: list[str]) -> None:
+    """Delete only the rows an incremental run is about to re-insert.
+
+    Untouched history stays in place, so a second `codegraph index` cannot wipe
+    the graph. Decisions and their line links are always fully re-derived by the
+    indexer, so they are replaced wholesale. Edges are rewritten from the merged
+    in-memory set, which keeps the edge count stable across runs.
+
+    Args:
+        conn: Open SQLite connection.
+        node_uids: Node uids being rewritten.
+    """
+    conn.execute("DELETE FROM decisions")
+    conn.execute("DELETE FROM decision_code_links")
+    conn.execute("DELETE FROM edges")
+    for chunk in _chunks(node_uids):
+        marks = ",".join("?" * len(chunk))
+        conn.execute(f"DELETE FROM nodes WHERE uid IN ({marks})", chunk)
     conn.commit()
 
 
@@ -242,14 +299,36 @@ def _row_to_node(row: tuple) -> CodeNode:
     )
 
 
-def find_node_at_line(conn: sqlite3.Connection, file_path: str, line: int) -> CodeNode | None:
-    """Return the innermost CodeNode covering file:line (latest version)."""
+def find_node_at_line(
+    conn: sqlite3.Connection,
+    file_path: str,
+    line: int,
+    at: datetime | None = None,
+) -> CodeNode | None:
+    """Return the innermost live CodeNode covering file:line.
+
+    A node version is live when ``valid_to`` is NULL or still in the future at
+    ``at``. Dead versions (a symbol that moved or was deleted) are never
+    returned, so ``why`` cannot answer about a line using a tombstoned node.
+
+    Args:
+        conn: Open SQLite connection.
+        file_path: Repo-relative source path.
+        line: 1-based line number.
+        at: Reference instant; defaults to now (UTC).
+
+    Returns:
+        The innermost live CodeNode version, or None when the line has no live node.
+    """
+    reference = at or datetime.now(timezone.utc)
     rows = conn.execute(
         "SELECT uid, kind, name, file_path, line_start, line_end, language, parent_uid, "
         "valid_from, valid_to, commit_sha "
         "FROM nodes WHERE file_path = ? AND line_start <= ? AND line_end >= ? "
-        "ORDER BY (line_end - line_start) ASC, valid_from DESC LIMIT 1",
-        (file_path, line, line),
+        "AND (valid_to IS NULL OR valid_to >= ?) "
+        "ORDER BY (valid_to IS NULL) DESC, (line_end - line_start) ASC, valid_from DESC "
+        "LIMIT 1",
+        (file_path, line, line, reference.isoformat()),
     ).fetchall()
     if not rows:
         return None
@@ -473,7 +552,8 @@ def query_decisions_for_line_links(
     """Return decisions linked to a concrete file:line via decision_code_links."""
     rows = conn.execute(
         "SELECT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
-        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence "
+        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence, "
+        "d.category "
         "FROM decisions d "
         "JOIN decision_code_links l ON l.decision_uid = d.uid "
         "WHERE l.file_path = ? AND l.line = ? "
@@ -492,7 +572,8 @@ def query_decisions_for_node_lines(
     """Return decisions linked to any line inside a node range (line-level)."""
     rows = conn.execute(
         "SELECT DISTINCT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
-        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence "
+        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, d.confidence, "
+        "d.category "
         "FROM decisions d "
         "JOIN decision_code_links l ON l.decision_uid = d.uid "
         "WHERE l.file_path = ? AND l.line >= ? AND l.line <= ? "

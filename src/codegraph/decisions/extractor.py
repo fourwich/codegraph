@@ -1,7 +1,8 @@
-﻿"""Rule-based decision extraction (no LLM)."""
+"""Rule-based decision extraction (no LLM)."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 
@@ -118,6 +119,16 @@ def split_content_reason(sentence: str) -> tuple[str, str]:
     return text[:220], ""
 
 
+def content_fingerprint(text: str) -> str:
+    """Return a stable 8-hex-char fingerprint of decision content.
+
+    `hash()` is salted per process, so it cannot be used in a persisted uid;
+    blake2b gives the same value in every process and on every machine.
+    """
+    normalized = " ".join((text or "").split()).lower()
+    return hashlib.blake2b(normalized.encode("utf-8"), digest_size=4).hexdigest()
+
+
 def decision_from_sentence(
     sentence: str,
     *,
@@ -135,7 +146,7 @@ def decision_from_sentence(
     if len(content) > 220:
         content = content[:217] + "..."
     uid = make_uid(file_path or source_ref, "decision", uid_prefix, max(line or 1, 1))
-    uid = f"{uid}::{hash(content) & 0xFFFF:04x}"
+    uid = f"{uid}::{content_fingerprint(content)}"
     return Decision(
         uid=uid,
         content=content,

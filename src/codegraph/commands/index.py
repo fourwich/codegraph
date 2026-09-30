@@ -33,6 +33,9 @@ from codegraph.storage import (
     insert_decisions,
     insert_edges,
     insert_nodes,
+    load_edges,
+    load_nodes,
+    replace_graph_rows,
 )
 
 console = Console()
@@ -90,6 +93,44 @@ def parse_source_text(path_str: str, text: str) -> tuple[list[CodeNode], list[Ed
     return nodes, edges
 
 
+def _node_source(text: str, node: CodeNode) -> str:
+    """Return the source lines a node version covers."""
+    lines = text.splitlines()
+    return "\n".join(lines[node.line_start - 1 : node.line_end])
+
+
+def _has_unchanged_live_version(
+    versions: list[CodeNode],
+    node: CodeNode,
+    text: str,
+    history,
+    rel_path: str,
+    text_cache: dict[tuple[str, str], str],
+) -> bool:
+    """True when an equivalent live version of this symbol already exists.
+
+    Two versions count as equivalent only when they cover the same line range
+    *and* the same source text. That keeps exactly one live version per symbol
+    (no double counting in `graph --at`) without dropping real edits whose line
+    range happened to stay the same.
+    """
+    for prev in versions:
+        if prev.valid_to is not None:
+            continue
+        if prev.line_start != node.line_start or prev.line_end != node.line_end:
+            continue
+        if prev.commit_sha == node.commit_sha:
+            return True
+        cache_key = (prev.commit_sha, rel_path)
+        prev_text = text_cache.get(cache_key)
+        if prev_text is None:
+            prev_text = history.get_file_at_commit(prev.commit_sha, rel_path)
+            text_cache[cache_key] = prev_text
+        if prev_text and _node_source(prev_text, prev) == _node_source(text, node):
+            return True
+    return False
+
+
 def close_previous_versions(
     live: dict[tuple[str, str], list[CodeNode]],
     key: tuple[str, str],
@@ -107,8 +148,10 @@ def ingest_commit(
     live: dict[tuple[str, str], list[CodeNode]],
     all_nodes: list[CodeNode],
     all_edges: list[Edge],
+    text_cache: dict[tuple[str, str], str] | None = None,
 ) -> None:
     """Parse changed source files at one commit and version nodes."""
+    cache = text_cache if text_cache is not None else {}
     for rel in commit.changed_files:
         rel_n = normalize_location_path(rel)
         if is_skipped_path(history.root, rel_n) or not is_supported_source(Path(rel_n)):
@@ -138,11 +181,15 @@ def ingest_commit(
 
         for node in nodes:
             key = (node.file_path, node.name)
-            # Close older version of the same symbol when lines change
+            if _has_unchanged_live_version(
+                live.get(key, []), node, text, history, rel_n, cache
+            ):
+                # Same symbol, same lines, same source: keep the existing version
+                # instead of forking a second live version.
+                continue
+            # Close every other live version of this symbol before appending.
             for prev in live.get(key, []):
-                if prev.valid_to is None and (
-                    prev.line_start != node.line_start or prev.line_end != node.line_end
-                ):
+                if prev.valid_to is None:
                     prev.valid_to = commit.timestamp
             live.setdefault(key, []).append(node)
             all_nodes.append(node)
@@ -294,20 +341,123 @@ def bind_decisions_to_lines(
     return links
 
 
+class GraphShrinkError(RuntimeError):
+    """Raised when an incremental run would shrink the stored graph."""
+
+
+def guard_node_collapse(new_count: int, previous_count: int, *, replace: bool) -> None:
+    """Refuse an incremental write that would drop most of the stored graph.
+
+    A full rebuild or a first index may legitimately produce any count; an
+    incremental merge must never shrink the graph by more than half.
+
+    Args:
+        new_count: Node versions about to be written.
+        previous_count: Node versions currently stored.
+        replace: True when the write is a full rebuild.
+
+    Raises:
+        GraphShrinkError: When the write would lose data.
+    """
+    if replace or previous_count <= 0:
+        return
+    if new_count < previous_count * 0.5:
+        raise GraphShrinkError(
+            f"node count would drop from {previous_count} to {new_count}; "
+            "this looks like a lost-history rebuild"
+        )
+
+
+def _close_superseded_live_versions(nodes: list[CodeNode]) -> int:
+    """Repair a legacy graph that has several live versions of one symbol.
+
+    Older `index` runs could leave two simultaneously-live versions of the same
+    (file_path, name). Keep the newest and close the rest at its `valid_from`.
+
+    Returns:
+        Number of versions that were closed.
+    """
+    groups: dict[tuple[str, str], list[CodeNode]] = {}
+    for node in nodes:
+        if node.valid_to is None:
+            groups.setdefault((node.file_path, node.name), []).append(node)
+    closed = 0
+    for versions in groups.values():
+        if len(versions) < 2:
+            continue
+        versions.sort(key=lambda n: n.valid_from)
+        keeper = versions[-1]
+        for older in versions[:-1]:
+            older.valid_to = keeper.valid_from
+            closed += 1
+    return closed
+
+
+def _load_stored_graph(db_path: Path) -> tuple[list[CodeNode], list[Edge]]:
+    """Load the persisted graph so an incremental run can merge into it."""
+    conn = connect(db_path)
+    try:
+        init_schema(conn)
+        return load_nodes(conn), load_edges(conn)
+    finally:
+        conn.close()
+
+
+def _is_flat_worktree_graph(nodes: list[CodeNode]) -> bool:
+    """True when every stored node comes from a working-tree snapshot, not Git."""
+    return all(node.commit_sha == "WORKTREE" for node in nodes)
+
+
+def _recorded_node_count(root: Path) -> int:
+    """Node versions the last successful index claimed to have written (0 if unknown)."""
+    from codegraph.git.incremental import load_last_state
+
+    value = load_last_state(root).get("node_count")
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
 def write_sqlite_graph(
     db_path: Path,
     nodes: list[CodeNode],
     edges: list[Edge],
     decisions: list[Decision],
     links: list[tuple[str, str, str, int]] | None = None,
+    *,
+    replace: bool = True,
 ) -> tuple[int, int, int]:
-    """Persist nodes/edges/decisions/links and return counts."""
+    """Persist nodes/edges/decisions/links and return counts.
+
+    Args:
+        db_path: SQLite database path.
+        nodes: Node versions to store (full merged set when incremental).
+        edges: Edges to store (full merged set when incremental).
+        decisions: Decisions to store.
+        links: decision_code_links rows.
+        replace: True for a full rebuild (clears the tables first). False for an
+            incremental run, where only the rows being rewritten are deleted.
+
+    Returns:
+        (node_count, edge_count, decision_count) after the write.
+    """
     conn = connect(db_path)
     try:
         init_schema(conn)
-        clear_graph(conn)
+        if replace:
+            clear_graph(conn)
+        else:
+            replace_graph_rows(conn, [n.uid for n in nodes])
+        node_uids = {n.uid for n in nodes}
+        live_edges = [e for e in edges if e.from_uid in node_uids and e.to_uid in node_uids]
+        if len(live_edges) != len(edges):
+            logger.debug(
+                "Dropped %d edge(s) whose endpoints are not stored nodes",
+                len(edges) - len(live_edges),
+            )
         insert_nodes(conn, nodes)
-        insert_edges(conn, edges)
+        insert_edges(conn, live_edges)
         insert_decisions(conn, decisions)
         insert_decision_links(conn, links or [])
         return count_nodes(conn), count_edges(conn), count_decisions(conn)
@@ -404,6 +554,7 @@ def index_command(
     all_nodes: list[CodeNode] = []
     all_edges: list[Edge] = []
     live: dict[tuple[str, str], list[CodeNode]] = {}
+    text_cache: dict[tuple[str, str], str] = {}
     commit_count = 0
 
     try:
@@ -412,30 +563,64 @@ def index_command(
         console.print(f"[yellow]warn[/] {exc}; parsing working tree only")
         history = None
 
-    if history is not None:
-        from codegraph.git.incremental import commits_after, save_last_head
+    db_path = db_path_for_root(root)
+    replace = full
+    previous_nodes = 0
+    previous_edges = 0
+    if not full and db_path.exists():
+        stored_nodes, stored_edges = _load_stored_graph(db_path)
+        recorded = _recorded_node_count(root)
+        if stored_nodes and history is not None and (
+            _is_flat_worktree_graph(stored_nodes) or 0 < len(stored_nodes) < recorded
+        ):
+            console.print(
+                "[yellow]warn[/] stored graph is incomplete "
+                f"({len(stored_nodes)} of {recorded or '?'} recorded node versions); "
+                "rebuilding from scratch"
+            )
+            replace = True
+        elif stored_nodes:
+            replace = False
+            previous_nodes = len(stored_nodes)
+            previous_edges = len(stored_edges)
+            repaired = _close_superseded_live_versions(stored_nodes)
+            if repaired:
+                console.print(
+                    f"[yellow]warn[/] repaired {repaired} duplicate live node version(s)"
+                )
+            all_nodes.extend(stored_nodes)
+            all_edges.extend(stored_edges)
+            for node in stored_nodes:
+                if node.valid_to is None:
+                    live.setdefault((node.file_path, node.name), []).append(node)
+            console.print(
+                f"[dim]incremental[/] keeping {previous_nodes} stored node version(s), "
+                f"{previous_edges} edge(s)"
+            )
 
-        if full:
+    head_sha = ""
+    if history is not None:
+        from codegraph.git.incremental import commits_after
+
+        if full or replace:
             commits = list(history.iter_commits(depth=depth))
             pending = list(reversed(commits))
         else:
             pending = commits_after(root, history, depth=depth)
         for commit in pending:
             try:
-                ingest_commit(history, commit, live, all_nodes, all_edges)
+                ingest_commit(history, commit, live, all_nodes, all_edges, text_cache)
                 commit_count += 1
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skip commit %s: %s", commit.sha, exc)
         try:
             head = next(history.iter_commits(depth=1), None)
             if head is not None:
-                save_last_head(root, head.sha)
+                head_sha = head.sha
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Cannot save incremental state: %s", exc)
+            logger.warning("Cannot read HEAD: %s", exc)
 
-    if not all_nodes and full:
-        _ingest_working_tree(root, all_nodes, all_edges, jobs=jobs)
-    elif not all_nodes:
+    if not all_nodes:
         _ingest_working_tree(root, all_nodes, all_edges, jobs=jobs)
 
     if use_llm:
@@ -450,11 +635,28 @@ def index_command(
         node_count, edge_count = len(all_nodes), len(all_edges)
         decision_count = len(decisions)
     else:
-        db_path = db_path_for_root(root)
+        try:
+            guard_node_collapse(len(all_nodes), previous_nodes, replace=replace)
+        except GraphShrinkError as exc:
+            console.print(f"[bold red]Refusing to write[/] {exc}")
+            console.print(
+                "[dim]Existing graph left untouched. Re-run with --full to rebuild "
+                "from scratch.[/]"
+            )
+            raise typer.Exit(code=4) from exc
         links = bind_decisions_to_lines(root, decisions, all_nodes)
         node_count, edge_count, decision_count = write_sqlite_graph(
-            db_path, all_nodes, all_edges, decisions, links
+            db_path, all_nodes, all_edges, decisions, links, replace=replace
         )
+
+    if head_sha:
+        # Record the persisted size so a truncated graph is detected next run.
+        from codegraph.git.incremental import save_last_head
+
+        try:
+            save_last_head(root, head_sha, node_count=node_count)
+        except OSError as exc:  # noqa: BLE001
+            logger.warning("Cannot save incremental state: %s", exc)
 
     if as_json:
         import json as jsonlib
