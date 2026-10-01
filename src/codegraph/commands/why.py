@@ -128,9 +128,20 @@ def load_decisions_sqlite(
             samples = find_decisions_for_location(file_path, line)
             return samples, ("line" if samples else "none")
         try:
-            rows = query_decisions_for_line_links(conn, file_path, line)
-            if rows:
-                level = "line"
+            # A line-level record is any record linked to the symbol that covers
+            # this line. Querying the node range first stops an unrelated
+            # exact-line commit record from shadowing it.
+            covering = find_node_at_line(conn, file_path, line)
+            if covering is not None:
+                rows = query_decisions_for_node_lines(
+                    conn, file_path, covering.line_start, covering.line_end
+                )
+                if rows:
+                    level = "line"
+            if not rows:
+                rows = query_decisions_for_line_links(conn, file_path, line)
+                if rows:
+                    level = "line"
             if not rows:
                 rows = query_decisions_for_line(conn, file_path, line)
             if not rows:

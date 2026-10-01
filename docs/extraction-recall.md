@@ -35,10 +35,10 @@ state a reason — in which case they are dependency **decisions**.
 | Project | Depth | Records | Decisions | Decision share | With reason | With alternative |
 |---|---|---|---|---|---|---|
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 56 | **9** | 16.1% | 8 | 6 |
+| CodeGraph self | 50 | 57 | **9** | 15.8% | 8 | 6 |
 
 The Express row is the stable reference. The self row was measured on this
-repository at commit `54f034b`, and drifts by roughly one record per commit made
+repository at commit `1d3538d`, and drifts by roughly one record per commit made
 to this repository — re-run the script to get the current figure.
 
 The old headline was "174 decisions on Express". Under the tier model the same
@@ -55,6 +55,41 @@ every conventional-commit subject as a decision. That traded precision for a
 bigger number and has been reverted: those 199 extra records are now events,
 still stored, still queryable with `--include-events`, but never presented as
 answers.
+
+## Binding (what `why` can actually reach)
+
+A record is only useful if a query can find it.
+
+| Source | Binding rule |
+|---|---|
+| commit decision | changed lines of that commit that land inside a CodeNode |
+| commit decision spanning > 10 files or > 250 lines | no line links; reachable through the commit-level fallback only |
+| ADR / CHANGELOG decision | `governs:` declaration → backticked path → distinctive backticked identifier |
+
+Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
+cheapest way to make an ADR answer for the code it describes. In this repository
+3 of the 9 decisions are bound that way, so `why src/codegraph/storage.py:200`
+returns ADR-001 instead of nothing.
+
+Line links per repository, same index run:
+
+| | before | after |
+|---|---|---|
+| `decision_code_links` rows | 9323 | 1606 |
+| widest single record | 3233 links / 46 files | 233 links / 5 files |
+
+## Conflict precision
+
+`codegraph conflicts` used raw substring matching: `use` fired inside `because`,
+`sync` inside `async`, and any two decisions in one folder could be reported as
+contradictory. On this repository that produced **5 conflicts, 4 of them false**.
+
+Now opposite terms match on word boundaries, the two decisions must share a file
+(or a folder *and* vocabulary), and the generic pairs (`add`/`remove`,
+`keep`/`drop`) only count when the topic really overlaps. Temporal conflicts
+additionally require opposite terms — being close in time is not a contradiction.
+Result on this repository: **1 conflict**, the deliberate stateful-vs-stateless
+pair in `docs/adr/004` vs `docs/adr/005`.
 
 ## Sample decisions now captured on Express
 

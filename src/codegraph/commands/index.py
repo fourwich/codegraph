@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from codegraph.models import (
     SAMPLE_DECISIONS,
     CodeNode,
     Decision,
+    DecisionTier,
     Edge,
     normalize_location_path,
 )
@@ -42,6 +44,35 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 MAX_CHANGED_LINES = 1000  # skip line-binding on huge diffs
+
+# A decision that claims thousands of lines is not a line-level fact.
+MAX_BINDING_FILES = 10
+MAX_BINDING_LINES = 250
+
+# Governed (ADR-style) binding stays deliberately small.
+MAX_GOVERNED_FILES = 12
+MAX_GOVERNED_NODES_PER_FILE = 60
+MAX_GOVERNED_NODES = 200
+
+GOVERNS_FRONT_MATTER = re.compile(r"^\s*governs\s*:\s*(?P<paths>.+)$", re.IGNORECASE | re.MULTILINE)
+GOVERNS_COMMENT = re.compile(
+    r"<!--\s*governs?\s*:\s*(?P<paths>.*?)\s*-->", re.IGNORECASE | re.DOTALL
+)
+BACKTICKED_PATH = re.compile(
+    r"`([A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|mjs|cjs|java|go|rs|cpp|cc|cxx|hpp|hh|hxx|h))`"
+)
+BACKTICKED_IDENT = re.compile(r"`([A-Za-z_][A-Za-z0-9_.]*)`")
+
+
+def is_distinctive_identifier(ident: str) -> bool:
+    """True when a backticked word is specific enough to identify code.
+
+    Stops prose words like `index` or `decision` from binding an ADR to random
+    symbols.
+    """
+    if len(ident) < 6:
+        return False
+    return "_" in ident or ident[0].isupper() or len(ident) >= 10
 
 SKIP_DIRS = {
     "node_modules",
@@ -288,12 +319,151 @@ def _commit_sha_from_ref(source_ref: str) -> str:
     return ""
 
 
+def parse_governs(text: str) -> list[str]:
+    """Return the code paths a document declares it governs.
+
+    Two forms are recognised, so both MD/ADR conventions work:
+
+    * a front-matter or inline line `governs: src/a.py, src/b/`
+    * an HTML comment `<!-- governs: src/a.py -->`
+    """
+    out: list[str] = []
+    for pattern in (GOVERNS_FRONT_MATTER, GOVERNS_COMMENT):
+        for match in pattern.finditer(text or ""):
+            for raw in re.split(r"[,\s]+", match.group("paths").strip()):
+                value = normalize_location_path(raw).strip("`'\"*-")
+                if value and value not in out:
+                    out.append(value)
+    return out
+
+
+def _representative_nodes(nodes: list[CodeNode]) -> list[CodeNode]:
+    """One node per (file, name), preferring the live version.
+
+    Governed bindings must cover a whole file, not just its oldest symbols, so
+    historical duplicates are collapsed before the fan-out cap is applied.
+    """
+    best: dict[tuple[str, str], CodeNode] = {}
+    for node in nodes:
+        key = (node.file_path, node.name)
+        prev = best.get(key)
+        if prev is None:
+            best[key] = node
+            continue
+        prev_live, node_live = prev.valid_to is None, node.valid_to is None
+        if node_live != prev_live:
+            if node_live:
+                best[key] = node
+        elif _as_utc(node.valid_from) > _as_utc(prev.valid_from):
+            best[key] = node
+    return sorted(best.values(), key=lambda n: n.line_start)
+
+
+def _governed_nodes(
+    text: str,
+    by_file: dict[str, list[CodeNode]],
+    node_names: dict[str, list[CodeNode]],
+) -> list[tuple[str, CodeNode]]:
+    """Resolve the code a prose decision points at.
+
+    Sources, in order of precision: an explicit `governs:` declaration, a
+    backticked source path, and a backticked identifier that is a real node name.
+    """
+    targets: list[tuple[str, CodeNode]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(path: str, node: CodeNode) -> None:
+        key = (path, node.uid)
+        if key not in seen:
+            seen.add(key)
+            targets.append((path, node))
+
+    paths = parse_governs(text)
+    paths += [normalize_location_path(p) for p in BACKTICKED_PATH.findall(text or "")]
+    for value in paths:
+        if len(targets) >= MAX_GOVERNED_NODES:
+            break
+        if value in by_file:
+            for node in by_file[value][:MAX_GOVERNED_NODES_PER_FILE]:
+                add(value, node)
+            continue
+        prefix = value.rstrip("/") + "/"
+        matched = sorted(f for f in by_file if f.startswith(prefix))
+        for file_path in matched[:MAX_GOVERNED_FILES]:
+            if len(targets) >= MAX_GOVERNED_NODES:
+                break
+            for node in by_file[file_path][:MAX_GOVERNED_NODES_PER_FILE]:
+                add(file_path, node)
+
+    for ident in BACKTICKED_IDENT.findall(text or ""):
+        if "." in ident or not is_distinctive_identifier(ident):
+            continue
+        candidates = node_names.get(ident, [])
+        if not candidates or len({n.file_path for n in candidates}) > 3:
+            continue  # too generic to be evidence about code
+        for node in candidates[:MAX_GOVERNED_NODES_PER_FILE]:
+            add(node.file_path, node)
+    return targets
+
+
+def _read_decision_text(root: Path, decision: Decision) -> str:
+    """Read the document a prose decision came from, when it is a local file."""
+    if not decision.file_path or not decision.file_path.endswith(".md"):
+        return ""
+    path = (root / decision.file_path).resolve()
+    try:
+        if path.is_file() and path.is_relative_to(root):
+            return path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return ""
+    return ""
+
+
+def cap_links(
+    links: list[tuple[str, str, str, int]],
+    *,
+    max_files: int = MAX_BINDING_FILES,
+    max_lines: int = MAX_BINDING_LINES,
+) -> list[tuple[str, str, str, int]]:
+    """Drop bindings that claim too much code to be a line-level fact.
+
+    A commit that touched half the repository is provenance for a whole change,
+    not evidence about a single line; such decisions stay reachable through the
+    commit-level fallback instead of claiming hundreds of line links.
+    """
+    grouped: dict[str, list[tuple[str, str, str, int]]] = {}
+    for item in links:
+        grouped.setdefault(item[0], []).append(item)
+    kept: list[tuple[str, str, str, int]] = []
+    dropped = 0
+    for decision_uid, items in grouped.items():
+        files = {item[2] for item in items}
+        if len(files) > max_files or len(items) > max_lines:
+            dropped += 1
+            logger.debug(
+                "No line binding for %s: %s file(s), %s line(s)",
+                decision_uid,
+                len(files),
+                len(items),
+            )
+            continue
+        kept.extend(items)
+    if dropped:
+        logger.info("Kept commit-level binding for %s over-broad decision(s)", dropped)
+    return kept
+
+
 def bind_decisions_to_lines(
     root: Path,
     decisions: list[Decision],
     nodes: list[CodeNode],
 ) -> list[tuple[str, str, str, int]]:
-    """Bind commit decisions to concrete changed lines that fall inside CodeNodes.
+    """Bind decisions to the code they describe.
+
+    Commit decisions bind to the changed lines that fall inside a CodeNode.
+    Decisions without a commit (ADRs, CHANGELOG entries) bind to the code they
+    name: an explicit `governs:` declaration, a backticked source path, or a
+    backticked identifier that matches a node name.
 
     Returns:
         Rows for decision_code_links: (decision_uid, node_uid, file_path, line).
@@ -302,6 +472,12 @@ def bind_decisions_to_lines(
     by_file: dict[str, list[CodeNode]] = {}
     for node in nodes:
         by_file.setdefault(node.file_path, []).append(node)
+
+    governed_by_file = {path: _representative_nodes(items) for path, items in by_file.items()}
+    governed_names: dict[str, list[CodeNode]] = {}
+    for items in governed_by_file.values():
+        for node in items:
+            governed_names.setdefault(node.name, []).append(node)
 
     for decision in decisions:
         sha = _commit_sha_from_ref(decision.source_ref)
@@ -316,6 +492,14 @@ def bind_decisions_to_lines(
                 if matches:
                     node = min(matches, key=lambda n: n.line_end - n.line_start)
                     links.append((decision.uid, node.uid, decision.file_path, decision.line))
+                continue
+            if decision.tier is DecisionTier.DECISION:
+                text = _read_decision_text(root, decision)
+                haystack = "\n".join(
+                    [decision.content, decision.reason, *decision.alternatives, text]
+                )
+                for path, node in _governed_nodes(haystack, governed_by_file, governed_names):
+                    links.append((decision.uid, node.uid, path, node.line_start))
             continue
 
         try:
@@ -328,7 +512,11 @@ def bind_decisions_to_lines(
                 )
                 filtered: dict[str, list[int]] = {}
                 for fpath, lines in changed.items():
-                    hits = [ln for ln in lines if any(n.contains_line(ln) for n in by_file.get(fpath, []))]
+                    hits = [
+                        ln
+                        for ln in lines
+                        if any(n.contains_line(ln) for n in by_file.get(fpath, []))
+                    ]
                     if hits:
                         filtered[fpath] = hits[:200]
                 changed = filtered
@@ -345,6 +533,7 @@ def bind_decisions_to_lines(
                 links.append((decision.uid, node.uid, decision.file_path, decision.line))
             continue
 
+        decision_links: list[tuple[str, str, str, int]] = []
         for file_path, lines in changed.items():
             candidates = by_file.get(file_path, [])
             for ln in lines:
@@ -352,7 +541,8 @@ def bind_decisions_to_lines(
                 if not hit:
                     continue
                 node = min(hit, key=lambda n: n.line_end - n.line_start)
-                links.append((decision.uid, node.uid, file_path, ln))
+                decision_links.append((decision.uid, node.uid, file_path, ln))
+        links.extend(cap_links(decision_links))
     return links
 
 

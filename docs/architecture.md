@@ -51,6 +51,34 @@ dependency records.
 
 ---
 
+## Binding a decision to code
+
+`decision_code_links` is what makes `why` work, so it is deliberately narrow:
+
+- **Commit decisions** bind to the changed lines of their commit that land inside
+  a CodeNode. A decision claiming more than 10 files or 250 lines is dropped from
+  line binding and stays reachable through the commit-level fallback instead — a
+  commit that touched half the repository is not a fact about one line.
+- **Prose decisions** (ADRs, CHANGELOG) have no commit of their own. They bind to
+  the code they name, in order of precision:
+  1. an explicit declaration — `governs: src/app.py, src/pkg/` in the front
+     matter, or `<!-- governs: src/app.py -->` in the body;
+  2. a backticked source path that exists in the graph;
+  3. a backticked identifier that matches a real node name **and** is distinctive
+     (CamelCase, snake_case, or at least 10 characters) and appears in at most
+     three files.
+
+  `why` treats "linked to the symbol covering this line" as line level, so a
+  governed file answers for every symbol inside it.
+
+Conflict detection works on the same principle: opposite terms are matched on word
+boundaries, two decisions must be in the same file (or the same folder *and*
+share vocabulary), and the generic pairs (`add`/`remove`, `keep`/`drop`) only
+count when the two decisions really are about the same thing. A temporal conflict
+additionally requires opposite terms — being close in time is not a contradiction.
+
+---
+
 ## Eight commands
 
 | Command | Purpose |
@@ -91,8 +119,9 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
+| ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 100 tests passing (`pytest -q`) |
+| ✅ Done | 114 tests passing (`pytest -q`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |
 | ✅ Done | Optional Ollama LLM extraction hook (`--use-llm`) |

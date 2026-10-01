@@ -1,5 +1,7 @@
 # ADR-001: SQLite as the default graph store
 
+<!-- governs: src/codegraph/storage.py -->
+
 ## Status
 
 Accepted

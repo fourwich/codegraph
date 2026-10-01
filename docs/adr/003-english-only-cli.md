@@ -1,5 +1,7 @@
 # ADR-003: English-only user-facing CLI strings
 
+<!-- governs: src/codegraph/commands/ -->
+
 ## Status
 
 Accepted

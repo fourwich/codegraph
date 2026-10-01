@@ -1,5 +1,7 @@
 # ADR-002: tree-sitter for code parsing
 
+<!-- governs: src/codegraph/parser/ -->
+
 ## Status
 
 Accepted

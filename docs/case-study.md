@@ -107,9 +107,11 @@ Honest result: Express `lib/` did not produce contradictory accepted decisions u
   recall: the tool says "I don't know" more often, and that is deliberate.
 - 4 of the 5 Express decisions are not bound to a line, so `why` reaches them
   through the file / directory fallback and labels the binding accordingly.
-- ADR and CHANGELOG decisions are not bound to code at all yet — they have no
-  commit sha and no `file:line`, so `why` cannot surface them. Binding an ADR to
-  the files it governs is the next concrete improvement.
+- ADR and CHANGELOG decisions have no commit of their own. They bind only to code
+  they name — a `governs:` declaration, a backticked path, or a distinctive
+  backticked identifier. Express has no ADR directory, so nothing there is
+  governed; in this repository `<!-- governs: src/codegraph/storage.py -->` is
+  what makes `why src/codegraph/storage.py:200` return ADR-001.
 - `why lib/router/index.js:100` returned no decision when that exact line was not
   inside a linked node range in this shallow history.
 - `--format` date refs must match a calendar day that contains a commit;

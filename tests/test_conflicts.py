@@ -1,4 +1,4 @@
-﻿"""Tests for three-layer conflict detection."""
+"""Tests for three-layer conflict detection."""
 
 from __future__ import annotations
 
@@ -45,6 +45,28 @@ def test_detect_word_opposites_stateful_vs_stateless() -> None:
     assert "stateful" in hits[0].matched_words or "stateless" in hits[0].matched_words
 
 
+def test_word_opposites_need_a_shared_topic() -> None:
+    """Unrelated decisions in one folder are not a contradiction."""
+    a = _d("a", "Use SQLite as the default backend under .codegraph/graph.db.",
+           "Judges must run the CLI without a database server.", path="docs/adr/001.md")
+    b = _d("b", "We prefer stateless JWT tokens and avoid server-side session state.",
+           "Stateless tokens scale better.", path="docs/adr/005.md")
+    assert detect_word_opposites([a, b]) == []
+
+
+def test_word_matching_uses_boundaries() -> None:
+    """`use` must not fire inside `because`, nor `sync` inside `async`."""
+    a = _d("a", "Disable the retry loop because it hides failures.", path="src/x.py")
+    b = _d("b", "Enable the retry loop for flaky networks.", path="src/x.py")
+    hits = detect_word_opposites([a, b])
+    assert hits, "the enable/disable pair should still be detected"
+    assert set(hits[0].matched_words) == {"enable", "disable"}
+
+    c = _d("c", "Keep the async client as the only transport.", path="src/y.py")
+    d = _d("d", "Keep synchronous calls for simplicity.", path="src/y.py")
+    assert detect_word_opposites([c, d]) == []
+
+
 def test_detect_supersede_conflicts() -> None:
     a = _d("a", "Use offset pagination.")
     b = _d("b", "Supersedes Use offset pagination because deep pages were slow.")
@@ -54,10 +76,20 @@ def test_detect_supersede_conflicts() -> None:
 
 
 def test_detect_temporal_conflicts() -> None:
-    a = _d("a", "Enable strict TypeScript checks.", ts=TS)
-    b = _d("b", "Use lazy loading for all modules.", ts=TS + timedelta(days=2))
+    """A short-window reversal with opposite terms is temporal."""
+    a = _d("a", "Enable strict TypeScript checks.", ts=TS, path="src/x.ts")
+    b = _d("b", "Disable strict TypeScript checks for the legacy folder.",
+           ts=TS + timedelta(days=2), path="src/x.ts")
     hits = detect_temporal_conflicts([a, b])
     assert hits and hits[0].type == "temporal"
+
+
+def test_temporal_ignores_unrelated_neighbours() -> None:
+    """Two unrelated decisions close in time are not a conflict."""
+    a = _d("a", "Enable strict TypeScript checks.", ts=TS, path="src/x.ts")
+    b = _d("b", "Use lazy loading for all modules.", ts=TS + timedelta(days=2),
+           path="src/x.ts")
+    assert detect_temporal_conflicts([a, b]) == []
 
 
 def test_detect_all_deduplicates() -> None:

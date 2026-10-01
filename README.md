@@ -92,6 +92,15 @@ codegraph serve --port 8080
 says so, and a location with no decision says so instead of guessing. Add
 `--include-events` to see the commit history behind a line.
 
+Decisions that have no commit of their own (ADRs, CHANGELOG entries) bind to the
+code they declare, so a design rule is reachable from the line it governs:
+
+```markdown
+# ADR-001: SQLite as the default graph store
+
+<!-- governs: src/codegraph/storage.py -->
+```
+
 ## Tech stack
 
 | Layer | Choice |
