@@ -46,20 +46,36 @@ class LocationError(ValueError):
     """User-supplied file:line is invalid."""
 
 
+def normalize_user_path(raw: str) -> str:
+    """Normalize a user path, turning an absolute path inside cwd into a relative one.
+
+    Editors such as the VS Code extension hand over `doc.uri.fsPath`, which is
+    absolute; stored paths are repo-relative.
+    """
+    path = Path(raw)
+    if path.is_absolute():
+        for base in (Path.cwd(),):
+            try:
+                return path.resolve().relative_to(base.resolve()).as_posix()
+            except ValueError:
+                continue
+    return normalize_location_path(raw)
+
+
 def parse_location(raw: str) -> tuple[str, int]:
     """Parse `file:line` into (path, line)."""
     value = raw.strip()
     if not value:
-        raise LocationError("Location cannot be empty. Use the form src/auth/session.ts:42")
+        raise LocationError("Location cannot be empty. Use the form src/main.py:42")
     match = LOCATION_RE.match(value)
     if not match:
         raise LocationError(
-            f"Cannot parse location '{raw}'. Expected path:line, e.g. src/auth/session.ts:42"
+            f"Cannot parse location '{raw}'. Expected path:line, e.g. src/main.py:42"
         )
     line_no = int(match.group("line"))
     if line_no < 1:
         raise LocationError(f"Line number must be >= 1, got: {line_no}")
-    return normalize_location_path(match.group("file")), line_no
+    return normalize_user_path(match.group("file")), line_no
 
 
 def _current_stdout_encodes(text: str) -> bool:

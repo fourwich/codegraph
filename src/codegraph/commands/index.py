@@ -265,15 +265,24 @@ def build_edges_for_nodes(nodes: list[CodeNode]) -> list[Edge]:
 
 
 def load_decisions(
-    repo_path: Path, depth: int, use_llm: bool = False, llm_model: str = "llama3.2"
+    repo_path: Path,
+    depth: int,
+    use_llm: bool = False,
+    llm_model: str = "llama3.2",
+    progress_console: Console | None = None,
 ) -> list[Decision]:
-    """Extract real decisions; fall back to samples when empty."""
+    """Extract real decisions; fall back to samples when empty.
+
+    Args:
+        progress_console: Where human-readable warnings go; defaults to stdout
+            but is stderr when `--json` is in use so stdout stays parseable.
+    """
     decisions = extract_all(
         repo_path, depth=depth, use_llm=use_llm, llm_model=llm_model
     )
     if decisions:
         return decisions
-    console.print(
+    (progress_console or console).print(
         "[yellow]warn[/] No commit/ADR decisions found; storing bundled sample decisions"
     )
     return list(SAMPLE_DECISIONS)
@@ -678,7 +687,7 @@ def write_sqlite_graph(
         conn.close()
 
 
-def run_index_progress(steps: list[str]) -> None:
+def run_index_progress(steps: list[str], progress_console: Console | None = None) -> None:
     """Show multi-stage index progress bar."""
     with Progress(
         SpinnerColumn(),
@@ -686,7 +695,7 @@ def run_index_progress(steps: list[str]) -> None:
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
-        console=console,
+        console=progress_console or console,
     ) as progress:
         overall = progress.add_task("Indexing", total=len(steps))
         for step in steps:
@@ -759,10 +768,13 @@ def index_command(
         raise typer.Exit(code=2)
 
     root = target if target.is_dir() else target.parent
-    console.print(
+    # With --json the only thing on stdout must be the JSON document, so all
+    # human-facing output goes to stderr.
+    stream_console = Console(stderr=True) if as_json else console
+    stream_console.print(
         f"[bold cyan]Indexing[/] {target} ... [dim]backend={backend} depth={depth}[/]"
     )
-    run_index_progress(INDEX_STEPS)
+    run_index_progress(INDEX_STEPS, progress_console=stream_console)
 
     all_nodes: list[CodeNode] = []
     all_edges: list[Edge] = []
@@ -773,7 +785,7 @@ def index_command(
     try:
         history = GitHistory(root)
     except ValueError as exc:
-        console.print(f"[yellow]warn[/] {exc}; parsing working tree only")
+        stream_console.print(f"[yellow]warn[/] {exc}; parsing working tree only")
         history = None
 
     db_path = db_path_for_root(root)
@@ -786,7 +798,7 @@ def index_command(
         if stored_nodes and history is not None and (
             _is_flat_worktree_graph(stored_nodes) or 0 < len(stored_nodes) < recorded
         ):
-            console.print(
+            stream_console.print(
                 "[yellow]warn[/] stored graph is incomplete "
                 f"({len(stored_nodes)} of {recorded or '?'} recorded node versions); "
                 "rebuilding from scratch"
@@ -798,7 +810,7 @@ def index_command(
             previous_edges = len(stored_edges)
             repaired = _close_superseded_live_versions(stored_nodes)
             if repaired:
-                console.print(
+                stream_console.print(
                     f"[yellow]warn[/] repaired {repaired} duplicate live node version(s)"
                 )
             all_nodes.extend(stored_nodes)
@@ -806,7 +818,7 @@ def index_command(
             for node in stored_nodes:
                 if node.valid_to is None:
                     live.setdefault((node.file_path, node.name), []).append(node)
-            console.print(
+            stream_console.print(
                 f"[dim]incremental[/] keeping {previous_nodes} stored node version(s), "
                 f"{previous_edges} edge(s)"
             )
@@ -837,22 +849,25 @@ def index_command(
         _ingest_working_tree(root, all_nodes, all_edges, jobs=jobs)
 
     if use_llm:
-        console.print(
+        stream_console.print(
             f"[yellow]warn[/] --use-llm enabled (model={llm_model}); "
             "falls back to rules if Ollama is down"
         )
-    decisions = load_decisions(root, depth, use_llm=use_llm, llm_model=llm_model)
+    decisions = load_decisions(
+        root, depth, use_llm=use_llm, llm_model=llm_model,
+        progress_console=stream_console,
+    )
 
     if backend == "dgraph":
-        _write_dgraph(all_nodes, all_edges, decisions)
+        _write_dgraph(all_nodes, all_edges, decisions, progress_console=stream_console)
         node_count, edge_count = len(all_nodes), len(all_edges)
         decision_count = len(decisions)
     else:
         try:
             guard_node_collapse(len(all_nodes), previous_nodes, replace=replace)
         except GraphShrinkError as exc:
-            console.print(f"[bold red]Refusing to write[/] {exc}")
-            console.print(
+            stream_console.print(f"[bold red]Refusing to write[/] {exc}")
+            stream_console.print(
                 "[dim]Existing graph left untouched. Re-run with --full to rebuild "
                 "from scratch.[/]"
             )
@@ -905,14 +920,20 @@ def index_command(
     console.print("[dim]Next: codegraph why <file>:<line>  to view a decision card[/]")
 
 
-def _write_dgraph(nodes: list[CodeNode], edges: list[Edge], decisions: list[Decision]) -> None:
+def _write_dgraph(
+    nodes: list[CodeNode],
+    edges: list[Edge],
+    decisions: list[Decision],
+    progress_console: Console | None = None,
+) -> None:
     """Write the graph to Dgraph when requested."""
     from codegraph.graph import DgraphClient, DgraphConnectionError
 
+    out = progress_console or console
     try:
         client = DgraphClient()
         if not client.ping():
-            console.print(
+            out.print(
                 "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
                 "Run docker compose up -d first."
             )
@@ -928,7 +949,7 @@ def _write_dgraph(nodes: list[CodeNode], edges: list[Edge], decisions: list[Deci
     except typer.Exit:
         raise
     except DgraphConnectionError as exc:
-        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
+        out.print(f"[bold red]Dgraph connection failed[/] {exc}")
         raise typer.Exit(code=3) from exc
 
 

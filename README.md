@@ -1,6 +1,6 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-100%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
 [![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
 [![Downloads](https://img.shields.io/pypi/dm/codegraphx)](https://pypi.org/project/codegraphx/)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
@@ -13,7 +13,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph · 100 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph · 117 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -26,7 +26,7 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (100 tests passing).
+Verified with `pytest -q` and `codegraph --help` (117 tests passing).
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`)
@@ -35,7 +35,7 @@ Verified with `pytest -q` and `codegraph --help` (100 tests passing).
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 100 tests passing
+- [x] 117 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)

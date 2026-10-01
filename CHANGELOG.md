@@ -9,6 +9,8 @@
 - ADRs and CHANGELOG entries bind to the code they name, so a design rule can be reached from the line it governs.
 - A decision that claims more than 10 files or 250 lines keeps only a commit-level binding, so one noisy commit cannot claim thousands of lines.
 - Conflict detection matches whole words and requires a shared topic, so unrelated documents in one folder no longer contradict each other.
+- `codegraph index --json` writes progress to stderr, so stdout is a single JSON document that editors can parse.
+- `codegraph why` accepts an absolute path, which is what an editor hands over for the current file.
 
 ## Removed
 

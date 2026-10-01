@@ -38,7 +38,8 @@ def test_why_bad_format_friendly_error() -> None:
     result = runner.invoke(app, ["why", "badformat"])
     assert result.exit_code == 2
     assert "Invalid argument" in result.stdout
-    assert "src/auth/session.ts:42" in result.stdout
+    assert "path:line" in result.stdout
+    assert "src/main.py" in result.stdout
 
 
 def test_why_unknown_location_not_found() -> None:
