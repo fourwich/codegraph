@@ -15,6 +15,10 @@
 - `/api/timeline` honours its `scope` parameter. It previously ignored it, so the slider ticks came from every file in the graph.
 - `/api/why` uses the same resolution as the `codegraph why` command, including the symbol-range lookup, so the UI and the CLI cannot disagree about whether a decision exists for a line.
 - `codegraph serve` opens the browser only after the port is bound, instead of before uvicorn starts.
+- C++ in-class methods are nodes with the class as their parent, and their calls produce edges. Name resolution walks the declarator chain, so `int Calculator::compute(int)` and `int spin(int n)` inside a class are no longer anonymous, and a prototype (`int helper(int);`) is a function while `int limit = 3;` is not.
+- Rust `impl` blocks and Go methods now hang off the type they belong to: `impl Scale for Meter { fn scale }` attaches to `Meter`, and `func (c *Calculator) Add()` attaches to `Calculator`. Previously `impl_item` and `type_declaration` were dead entries in the kind maps.
+- Call edges resolve against every symbol live at that commit, not just the file being parsed. The git path previously produced **zero** cross-file `uses` edges while the working-tree path produced them, so the same repository gave two different graphs. Express: 1308 → 3951 `uses` edges, 2515 of them cross-file.
+- Git and working-tree parsing now share one edge rule; `ingest_commit` versions all changed files first, then resolves edges.
 
 ## Removed
 

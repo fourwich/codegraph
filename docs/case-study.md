@@ -11,19 +11,21 @@ Express is one of the most widely used Node.js web frameworks. Its Git history s
 - Commits indexed: **200**
 - Files parsed: JavaScript under `lib/`, `examples/`, root
 - Nodes: **5920** node versions
-- Edges: **883** (both endpoints stored)
+- Edges: **2409** (both endpoints stored; 1412 of them cross a file boundary)
 - Records: **204** = **5 decisions** + **199 history events**
 - Languages: JavaScript (`.js` / `.mjs` / `.cjs`)
-- Index wall time: **~66 s** (includes historical snapshots)
+- Index wall time: **~60 s** (includes historical snapshots)
 
-Two numbers moved after the 2026 correctness pass, both downwards because the old
-ones were inflated:
+The node and edge counts both moved during the 2026 correctness pass, in opposite
+directions:
 
 - **Nodes 7027 → 5920.** The old versioning opened a new node version every time
   a commit touched a file, so a symbol that never changed still got a fresh
   version per commit, and sometimes two simultaneously-live versions.
-- **Edges 1180 → 883.** About a quarter of the old edges pointed at node uids
-  that were never stored, so they could not be traversed or counted anyway.
+- **Edges 1180 → 2409.** Two separate bugs: the old count included edges pointing
+  at node uids that were never stored, and the git path resolved call edges only
+  within the file being parsed, so **no** call into another file produced an edge.
+  Both are fixed; 1412 Express edges now cross a file boundary.
 
 The record count also changed meaning. Express has **204 extractable records**;
 only **5 of them state a reason or a rejected alternative**. The rest are commit
@@ -72,10 +74,10 @@ That is intended: a commit subject is provenance, not an answer.
 
 ```text
 $ codegraph graph --at 2026-07-01 --scope lib
-Nodes     194      Edges      72      Decisions   1
+Nodes     194      Edges      88      Decisions   1
 
 $ codegraph graph --at 2026-09-28 --scope lib
-Nodes     194      Edges      72      Decisions   1
+Nodes     194      Edges      88      Decisions   1
 ```
 
 `lib/` is structurally flat over this window: the shallow clone's recent commits

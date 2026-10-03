@@ -20,6 +20,7 @@ from codegraph.models import (
     Edge,
     normalize_location_path,
 )
+from codegraph.parser.base import BaseParser
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
 from codegraph.git.diff import get_changed_lines
 from codegraph.storage import (
@@ -187,6 +188,16 @@ def close_previous_versions(
             node.valid_to = when
 
 
+def _live_nodes(live: dict[tuple[str, str], list[CodeNode]]) -> list[CodeNode]:
+    """Return every currently live node version."""
+    return [
+        node
+        for versions in live.values()
+        for node in versions
+        if node.valid_to is None
+    ]
+
+
 def ingest_commit(
     history: GitHistory,
     commit: CommitInfo,
@@ -195,8 +206,15 @@ def ingest_commit(
     all_edges: list[Edge],
     text_cache: dict[tuple[str, str], str] | None = None,
 ) -> None:
-    """Parse changed source files at one commit and version nodes."""
+    """Parse changed source files at one commit and version nodes.
+
+    Nodes are versioned first, then call edges are resolved against every symbol
+    live at this commit — including symbols introduced by the same commit in
+    another file. Resolving per file would drop cross-file calls, and the
+    working-tree path already resolves them, so the two would disagree.
+    """
     cache = text_cache if text_cache is not None else {}
+    parsed: list[tuple[BaseParser, list[CodeNode]]] = []
     for rel in commit.changed_files:
         rel_n = normalize_location_path(rel)
         if is_skipped_path(history.root, rel_n) or not is_supported_source(Path(rel_n)):
@@ -239,28 +257,14 @@ def ingest_commit(
             live.setdefault(key, []).append(node)
             all_nodes.append(node)
 
+        parsed.append((parser, nodes))
+
+    live_scope = _live_nodes(live)
+    for parser, nodes in parsed:
         try:
-            all_edges.extend(parser.extract_edges(nodes))
+            all_edges.extend(parser.extract_edges(nodes, scope=live_scope))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Edge extract failed for %s: %s", rel_n, exc)
-
-
-def build_edges_for_nodes(nodes: list[CodeNode]) -> list[Edge]:
-    """Fallback edge builder when parsers do not emit cross-file edges."""
-    by_uid = {n.uid: n for n in nodes}
-    edges: list[Edge] = []
-    for node in nodes:
-        if node.parent_uid and node.parent_uid in by_uid:
-            edges.append(
-                Edge(
-                    from_uid=node.parent_uid,
-                    to_uid=node.uid,
-                    kind="contains",
-                    file_path=node.file_path,
-                    line=node.line_start,
-                )
-            )
-    return edges
+            logger.warning("Edge extract failed for %s: %s", nodes[0].file_path, exc)
 
 
 def load_decisions(

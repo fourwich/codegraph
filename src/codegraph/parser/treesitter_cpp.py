@@ -11,7 +11,14 @@ from tree_sitter import Language, Parser
 
 from codegraph.models import CodeNode
 from codegraph.parser.base import BaseParser
-from codegraph.parser.common import decl_name, make_node, rel_path, simple_callee
+from codegraph.parser.common import (
+    decl_name,
+    declarator_name,
+    declares_a_function,
+    make_node,
+    rel_path,
+    simple_callee,
+)
 
 logger = logging.getLogger(__name__)
 _LANG = Language(tscpp.language())
@@ -20,7 +27,6 @@ KIND_MAP = {
     "function_definition": "function",
     "class_specifier": "class",
     "struct_specifier": "class",
-    "declaration": "function",
 }
 
 
@@ -57,9 +63,16 @@ class CppParser(BaseParser):
 
     def _walk(self, node, raw, rel, out, parent_uid, current_fn, commit_sha, valid_from):
         kind = KIND_MAP.get(node.type)
-        name = decl_name(node, raw)
+        name: str | None = None
         if node.type == "function_definition":
-            name = name or self._fn_declarator_name(node, raw)
+            name = declarator_name(node, raw)
+        elif node.type in {"declaration", "field_declaration"}:
+            # A prototype declares a function; `int x;` does not.
+            if declares_a_function(node):
+                kind = "function"
+                name = declarator_name(node, raw)
+        else:
+            name = decl_name(node, raw)
         next_parent, next_fn = parent_uid, current_fn
         if kind and name:
             code_node = make_node(
@@ -79,18 +92,3 @@ class CppParser(BaseParser):
                 )
         for child in node.children:
             self._walk(child, raw, rel, out, next_parent, next_fn, commit_sha, valid_from)
-
-    @staticmethod
-    def _fn_declarator_name(node, raw: bytes) -> str | None:
-        """Fallback name extraction from function declarator."""
-        for child in node.children:
-            if "declarator" in child.type:
-                name = decl_name(child, raw)
-                if name:
-                    return name
-                for sub in child.children:
-                    if sub.type == "identifier":
-                        return raw[sub.start_byte : sub.end_byte].decode(
-                            "utf-8", errors="replace"
-                        )
-        return None

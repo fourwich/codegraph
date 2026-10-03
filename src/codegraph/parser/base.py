@@ -49,18 +49,28 @@ class BaseParser(ABC):
         """
         raise NotImplementedError
 
-    def extract_edges(self, nodes: list[CodeNode]) -> list[Edge]:
+    def extract_edges(
+        self,
+        nodes: list[CodeNode],
+        calls: list[tuple[str, str, int, str]] | None = None,
+        scope: list[CodeNode] | None = None,
+    ) -> list[Edge]:
         """Derive relationship edges from hierarchy and call records.
 
         Args:
-            nodes: Already parsed nodes.
+            nodes: Nodes parsed for the file(s) being ingested.
+            calls: Call sites to resolve; defaults to the ones recorded by the
+                last `parse_text` on this parser.
+            scope: Extra nodes a callee may resolve to — the live graph at this
+                commit — so a call into another file still produces an edge.
+                Callers are always looked up among `nodes`.
 
         Returns:
             contains / defined_by / uses edges.
         """
         edges: list[Edge] = []
         edges.extend(self._hierarchy_edges(nodes))
-        edges.extend(self._call_edges(nodes))
+        edges.extend(self._call_edges(nodes, calls, scope))
         return edges
 
     def _hierarchy_edges(self, nodes: list[CodeNode]) -> list[Edge]:
@@ -90,17 +100,23 @@ class BaseParser(ABC):
                 )
         return edges
 
-    def _call_edges(self, nodes: list[CodeNode]) -> list[Edge]:
+    def _call_edges(
+        self,
+        nodes: list[CodeNode],
+        calls: list[tuple[str, str, int, str]] | None = None,
+        scope: list[CodeNode] | None = None,
+    ) -> list[Edge]:
         """Match call sites to known nodes and emit uses edges."""
+        sites = self._calls if calls is None else calls
         by_name: dict[str, list[CodeNode]] = {}
-        for node in nodes:
+        for node in list(nodes) + list(scope or []):
             by_name.setdefault(node.name, []).append(node)
 
         ordered = sorted(nodes, key=lambda n: (n.line_start, n.line_end))
         edges: list[Edge] = []
         seen: set[tuple[str, str, int]] = set()
 
-        for caller_name, callee_name, line, file_path in self._calls:
+        for caller_name, callee_name, line, file_path in sites:
             caller = self._find_caller(ordered, caller_name, line, file_path)
             targets = by_name.get(callee_name, [])
             if caller is None or not targets:

@@ -11,7 +11,7 @@ from tree_sitter import Language, Parser
 
 from codegraph.models import CodeNode
 from codegraph.parser.base import BaseParser
-from codegraph.parser.common import decl_name, make_node, rel_path, simple_callee
+from codegraph.parser.common import decl_name, make_node, rel_path, simple_callee, type_name
 
 logger = logging.getLogger(__name__)
 _LANG = Language(tsgo.language())
@@ -19,7 +19,6 @@ _LANG = Language(tsgo.language())
 KIND_MAP = {
     "function_declaration": "function",
     "method_declaration": "function",
-    "type_declaration": "class",
     "type_spec": "class",
 }
 
@@ -52,10 +51,14 @@ class GoParser(BaseParser):
         raw = source.encode("utf-8")
         tree = Parser(_LANG).parse(raw)
         out: list[CodeNode] = []
-        self._walk(tree.root_node, raw, rel, out, None, "", commit_sha, valid_from)
+        pending: list[tuple[CodeNode, str]] = []
+        self._walk(tree.root_node, raw, rel, out, None, "", commit_sha, valid_from, pending)
+        _attach_methods(out, pending)
         return out
 
-    def _walk(self, node, raw, rel, out, parent_uid, current_fn, commit_sha, valid_from):
+    def _walk(
+        self, node, raw, rel, out, parent_uid, current_fn, commit_sha, valid_from, pending
+    ):
         kind = KIND_MAP.get(node.type)
         name = decl_name(node, raw)
         next_parent, next_fn = parent_uid, current_fn
@@ -68,6 +71,11 @@ class GoParser(BaseParser):
                 next_parent = code_node.uid
             if kind == "function":
                 next_fn = name
+            if node.type == "method_declaration":
+                receiver = node.child_by_field_name("receiver")
+                resolved = _receiver_type(receiver, raw) if receiver is not None else None
+                if resolved:
+                    pending.append((code_node, resolved))
         if node.type == "call_expression":
             fn = node.child_by_field_name("function")
             callee = simple_callee(fn, raw) if fn is not None else None
@@ -76,4 +84,30 @@ class GoParser(BaseParser):
                     (current_fn or name or "", callee, node.start_point[0] + 1, rel)
                 )
         for child in node.children:
-            self._walk(child, raw, rel, out, next_parent, next_fn, commit_sha, valid_from)
+            self._walk(
+                child, raw, rel, out, next_parent, next_fn, commit_sha, valid_from, pending
+            )
+
+
+def _receiver_type(receiver, raw: bytes) -> str | None:
+    """Return the type a Go method hangs off: `func (c *Calculator) Add()`."""
+    for child in receiver.children:
+        if child.type in {"parameter_declaration", "variadic_parameter_declaration"}:
+            type_node = child.child_by_field_name("type")
+            if type_node is not None:
+                resolved = type_name(type_node, raw)
+                if resolved:
+                    return resolved
+    return None
+
+
+def _attach_methods(out: list[CodeNode], pending: list[tuple[CodeNode, str]]) -> None:
+    """Point methods at the type in their receiver."""
+    by_name: dict[str, CodeNode] = {}
+    for node in out:
+        if node.kind == "class":
+            by_name.setdefault(node.name, node)
+    for code_node, type_name_ in pending:
+        parent = by_name.get(type_name_)
+        if parent is not None:
+            code_node.parent_uid = parent.uid
