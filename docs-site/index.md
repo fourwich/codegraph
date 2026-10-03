@@ -11,7 +11,7 @@ Ask **why is this line here?** and get a decision card — not just a blame line
 - tree-sitter parsing (Python, TypeScript, Java, Go, Rust, C++)
 - Real Git time travel (`--at`)
 - Decision extraction from commits, ADRs, CHANGELOG
-- SQLite default · optional Dgraph backend
+- SQLite default · local SQLite store
 - Local Cytoscape visualizer (`codegraph serve`)
 - AI context packs (`codegraph export --for-ai`)
 

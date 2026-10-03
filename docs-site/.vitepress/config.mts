@@ -18,7 +18,6 @@ export default defineConfig({
           { text: "Getting started", link: "/guide/getting-started" },
           { text: "Installation", link: "/guide/installation" },
           { text: "First index", link: "/guide/first-index" },
-          { text: "Backends", link: "/guide/backends" },
         ],
       },
       {

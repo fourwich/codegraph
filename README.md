@@ -13,7 +13,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite default · optional Dgraph · 117 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 117 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -39,7 +39,6 @@ Verified with `pytest -q` and `codegraph --help` (117 tests passing).
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
-- [ ] Dgraph backend (client + flag done; live cluster optional)
 
 ## Language support
 
@@ -78,7 +77,7 @@ python -m venv .venv
 
 ```bash
 codegraph --help
-codegraph index . [--depth N] [--backend sqlite|dgraph] [--use-llm] [--json]
+codegraph index . [--depth N] [--use-llm] [--json] [--full]
 codegraph why docs/adr/001-use-sqlite-default.md:1 [--json] [--include-events]
 codegraph graph --at 2026-09-23 --scope src
 codegraph decisions --file CHANGELOG.md --timeline [--include-events]
@@ -109,7 +108,7 @@ code they declare, so a design rule is reachable from the line it governs:
 | Models | pydantic |
 | Parsing | tree-sitter (+ language grammars) |
 | Git | GitPython |
-| Storage | SQLite (default) · Dgraph (optional) |
+| Storage | SQLite (local `.codegraph/graph.db`) |
 | Web | FastAPI · Uvicorn · Cytoscape.js |
 | LLM (optional) | Ollama via httpx |
 | Editor | VSCode extension (TypeScript, `vscode-extension/`) |
@@ -123,28 +122,16 @@ pytest -q
 pytest --cov=src/codegraph
 ```
 
-## Optional: Dgraph backend
+## Storage
 
-SQLite remains the default. Dgraph is optional for multi-hop graph queries.
+Everything lives in one local SQLite database at `.codegraph/graph.db`, created
+by `codegraph index`. There is no server, no Docker and no network dependency.
 
-```bash
-# 1) Start Dgraph (requires Docker)
-docker compose up -d
-
-# 2) Index with Dgraph
-.venv\Scripts\codegraph.exe index . --backend dgraph
-
-# 3) Same commands accept --backend dgraph
-.venv\Scripts\codegraph.exe why docs/adr/001-use-sqlite-default.md:1 --backend dgraph
-.venv\Scripts\codegraph.exe graph --at 2024-11-02 --backend dgraph
-.venv\Scripts\codegraph.exe conflicts --scope src --backend dgraph
-.venv\Scripts\codegraph.exe export --for-ai --scope src --backend dgraph
-```
-
-Dgraph UI: http://localhost:8080/?latest  
-If Dgraph is down, `--backend dgraph` exits with code `3`. SQLite mode is unchanged.
-
-See `.env.example` for `DGRAPH_ALPHA`. If Dgraph is down, `--backend dgraph` exits with code `3`.
+A native graph backend (Dgraph or similar) was prototyped and **removed**: it was
+503 lines of untested client code behind `--backend dgraph`, with no multi-hop
+query that needed it, and two of its code paths returned sample data or silently
+ignored the flag. It comes back when a real multi-hop query justifies it — see
+[docs/adr/006-drop-dgraph-backend.md](docs/adr/006-drop-dgraph-backend.md).
 
 ## Project layout
 
@@ -153,17 +140,19 @@ src/codegraph/
   cli.py          # Typer entrypoint
   models.py       # CodeNode / Edge / Decision
   storage.py      # SQLite graph store
-  parser/         # tree-sitter TS + Python
-  graph/          # optional Dgraph backend
-  commands/       # index / why / graph / decisions
+  parser/         # tree-sitter parsers (7 languages)
+  commands/       # index / why / graph / decisions / conflicts / export / serve / diff
 tests/
-docs/             # demo script, prompts, submission copy
+docs/             # case study, benchmarks, ADRs, demo script, submission copy
 index.html        # product site
 ```
 
 ## Docs
 
-- Architecture overview (PDF source): `docs/architecture_overview.txt`
+- Architecture: `docs/architecture.md`
+- Decision extraction and precision: `docs/extraction-recall.md`
+- Case study on Express.js: `docs/case-study.md`
+- Architecture decisions: `docs/adr/`
 - 60s demo voiceover: `docs/demo_voiceover.md`
 - Competition copy: `docs/competition_submission.md`
 - Contributing: `CONTRIBUTING.md`

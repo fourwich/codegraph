@@ -46,12 +46,6 @@
           "default": "codegraph",
           "description": "Path to the codegraph CLI"
         },
-        "codegraph.backend": {
-          "type": "string",
-          "enum": ["sqlite", "dgraph"],
-          "default": "sqlite",
-          "description": "Graph backend"
-        },
         "codegraph.autoIndex": {
           "type": "boolean",
           "default": false,

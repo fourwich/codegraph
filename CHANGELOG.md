@@ -14,6 +14,8 @@
 
 ## Removed
 
-- Hard dependency on SAMPLE_DECISIONS for the happy path because extracted decisions replace them when present.
 - Conventional-commit subjects are no longer presented as decisions; they stay queryable as events with `--include-events`.
 - The generic `use` / `avoid` opposite pair, which matched inside ordinary English words.
+- The bundled sample decisions. `SAMPLE_DECISIONS` was written into the graph whenever a repository recorded no rationale, so a project with no decisions was shown five invented ones (including "PR #48 · Issue #31"). `why` now reports that it has no record instead.
+- The Dgraph backend and the `--backend` flag on every command ([ADR-006](docs/adr/006-drop-dgraph-backend.md)): `src/codegraph/graph/` (503 lines), `docker-compose.yml`, `.env.example`, `pydgraph`, the Dgraph tests and the `codegraph.backend` editor setting. One of its paths printed sample data, one ignored the flag, one always crashed, and no shipped query needed a graph database.
+- `docs/prompts/`, an internal agent-prompt pack that did not belong in a public repository.

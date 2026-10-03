@@ -23,6 +23,8 @@ export interface DecisionCard {
   line: number | null;
   constraints: string[];
   confidence: number;
+  category?: string;
+  tier?: string;
 }
 
 export interface WhyResult {
@@ -30,11 +32,11 @@ export interface WhyResult {
   line: number;
   node: CodeNodeInfo | null;
   decisions: DecisionCard[];
+  binding?: string;
 }
 
 export interface IndexResult {
   root: string;
-  backend: string;
   commits: number;
   nodes: number;
   edges: number;

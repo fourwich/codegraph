@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CodeGraph — The Decision Memory Layer for Your Codebase</title>
-  <meta name="description" content="Turn code structure, git history, and design decisions into one queryable graph. tree-sitter + Dgraph + Git timeline." />
+  <meta name="description" content="Turn code structure, git history, and design decisions into one queryable graph. tree-sitter + SQLite + Git timeline." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -56,7 +56,7 @@
         </div>
         <ul class="hero__tags" aria-label="Core capabilities">
           <li>tree-sitter parsing</li>
-          <li>Native graph (Dgraph)</li>
+          <li>Local SQLite graph store</li>
           <li>Git time travel</li>
           <li>Decision provenance</li>
         </ul>
@@ -113,7 +113,7 @@
         <p class="section__label">02 — Solution</p>
         <h2>Three layers, one graph</h2>
         <p class="section__intro">
-          Parse code with tree-sitter into AST relations (<code>uses</code> / <code>defined_by</code>) and store them in Dgraph,
+          Parse code with tree-sitter into AST relations (<code>uses</code> / <code>defined_by</code>) and store them in a local SQLite database,
           then overlay the Git timeline and decisions from PRs, issues, and ADRs.
           Query any historical snapshot of the code graph — or the decision behind a single line.
         </p>
@@ -157,8 +157,8 @@
           <div class="arch__col">
             <div class="arch__node arch__node--store">
               <span class="arch__kicker">Store</span>
-              <strong>Dgraph</strong>
-              <span>CodeNode · Decision · Discussion</span>
+              <strong>SQLite</strong>
+              <span>CodeNode · Edge · Decision</span>
             </div>
             <div class="arch__node arch__node--store">
               <span class="arch__kicker">Serve</span>
@@ -180,7 +180,7 @@
             <span class="why-point__num">02</span>
             <div>
               <h3>One line → decision provenance</h3>
-              <p><code>codegraph why file:line</code> emits a decision card: reason, alternatives, discussion, whether it was superseded.</p>
+              <p><code>codegraph why file:line</code> emits a decision card: reason, rejected alternatives, source commit, and whether the record is a decision or only history.</p>
             </div>
           </div>
           <div class="why-point">
@@ -225,7 +225,7 @@
           <article class="cmd">
             <code class="cmd__name">codegraph index &lt;path&gt;</code>
             <p>Parse code + ingest Git history + write the graph</p>
-            <span class="cmd__flags">--since · --lang</span>
+            <span class="cmd__flags">--depth · --full · --json</span>
           </article>
           <article class="cmd cmd--hl">
             <code class="cmd__name">codegraph why &lt;file&gt;:&lt;line&gt;</code>
@@ -297,20 +297,20 @@
               <li><span>reason</span> why</li>
               <li><span>alternatives</span> what was rejected</li>
               <li><span>status</span> accepted / superseded</li>
+              <li><span>tier</span> decision / event</li>
               <li><span>justifies</span> → CodeNode</li>
             </ul>
           </article>
           <article class="schema-card schema-card--discussion">
             <header>
-              <span class="schema-card__type">Discussion</span>
-              <span class="schema-card__role">Discussion</span>
+              <span class="schema-card__type">Edge</span>
+              <span class="schema-card__role">Relation</span>
             </header>
             <ul>
-              <li><span>platform</span> github / gitlab</li>
-              <li><span>title</span> topic</li>
-              <li><span>url</span> deep link</li>
-              <li><span>participants</span> people</li>
-              <li><span>created_at</span> time</li>
+              <li><span>from_uid</span> source node</li>
+              <li><span>to_uid</span> target node</li>
+              <li><span>kind</span> uses / contains</li>
+              <li><span>defined_by</span> → CodeNode</li>
             </ul>
           </article>
         </div>
@@ -354,12 +354,12 @@
             <span role="columnheader">Notes</span>
           </div>
           <div class="stack-row" role="row"><span>Code parsing</span><strong>tree-sitter</strong><span>Multi-language AST, latest stable</span></div>
-          <div class="stack-row" role="row"><span>Graph database</span><strong>Dgraph</strong><span>v23+, native graph queries</span></div>
+          <div class="stack-row" role="row"><span>Storage</span><strong>SQLite</strong><span>one local file, no server</span></div>
           <div class="stack-row" role="row"><span>CLI</span><strong>Python + Typer</strong><span>Python 3.10+</span></div>
           <div class="stack-row" role="row"><span>Visualization</span><strong>Cytoscape.js</strong><span>Local web graph view</span></div>
           <div class="stack-row" role="row"><span>Optional LLM</span><strong>Ollama</strong><span>Local-first</span></div>
-          <div class="stack-row" role="row"><span>Quality</span><strong>pytest · ruff · mypy</strong><span>Coverage &gt; 60%</span></div>
-          <div class="stack-row" role="row"><span>Delivery</span><strong>GitHub Actions · Docker</strong><span>CI + Dgraph Compose</span></div>
+          <div class="stack-row" role="row"><span>Quality</span><strong>pytest · ruff · mypy</strong><span>coverage 80%, 109 tests</span></div>
+          <div class="stack-row" role="row"><span>Delivery</span><strong>GitHub Actions</strong><span>lint · types · tests</span></div>
         </div>
       </div>
     </section>
@@ -384,7 +384,7 @@
         <strong>CodeGraph</strong>
         <span>Open-source MVP · MIT License</span>
       </div>
-      <p class="footer__note">This page is a product overview and demo prototype. CLI / Dgraph integration ships in phases.</p>
+      <p class="footer__note">Describes the shipped v0.2 CLI: local SQLite storage, decision / event tiers, ADR binding, 8 commands.</p>
     </div>
   </footer>
 

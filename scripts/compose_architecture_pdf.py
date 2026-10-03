@@ -177,7 +177,7 @@ def build_story() -> list:
     story.append(Paragraph("Architecture", s["h"]))
     diagram = (
         "Source files (.ts / .py) --&gt; tree-sitter --&gt; CodeNode + Edge<br/>"
-        "Git history (commits)   --&gt; GitHistory  --&gt; SQLite / Dgraph<br/>"
+        "Git history (commits)   --&gt; GitHistory  --&gt; SQLite<br/>"
         "Commit/ADR/CHANGELOG    --&gt; Decision extractor<br/>"
         "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br/>"
         "CLI: index / why / graph / ...<br/>"
@@ -233,10 +233,9 @@ def build_story() -> list:
             [
                 ["Parsing", "tree-sitter", "Multi-language, incremental"],
                 ["Git", "GitPython", "Read-only real Git history"],
-                ["Graph DB", "Dgraph", "Multi-hop decision tracing"],
                 ["CLI", "Typer + Rich", "Fast CLI, readable output"],
                 ["Models", "pydantic", "Typed data models"],
-                ["Storage", "SQLite", "Zero-config local default"],
+                ["Storage", "SQLite", "Zero-config local store, one file"],
             ],
             [28 * mm, 38 * mm, 104 * mm],
         )
@@ -248,10 +247,10 @@ def build_story() -> list:
         md_table(
             ["Status", "Item"],
             [
-                ["Done", "Product site · CLI (6 commands) · SQLite · real Git history"],
-                ["Done", "Decision extraction · time-travel graph --at · 48 tests"],
-                ["Done", "tree-sitter TS/Py/Java/Go/Rust/C++ · Web · VSCode · LLM hook"],
-                ["In progress", "Dgraph backend (optional live cluster)"],
+                ["Done", "Product site · CLI (8 commands) · SQLite · real Git history"],
+                ["Done", "Decision tiers · governed ADR binding · time-travel graph --at"],
+                ["Done", "tree-sitter TS/JS/Py/Java/Go/Rust/C++ · Web · VSCode · LLM hook"],
+                ["Removed", "Dgraph backend (ADR-006), replaced by one local store"],
             ],
             [28 * mm, 142 * mm],
         )

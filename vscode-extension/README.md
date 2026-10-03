@@ -11,7 +11,6 @@ Right-click a line → **CodeGraph: Show decision** to see why that line exists.
 ## Settings
 
 - `codegraph.cliPath` (default `codegraph`)
-- `codegraph.backend` (`sqlite` | `dgraph`)
 - `codegraph.autoIndex`
 
 ## Develop

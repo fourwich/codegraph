@@ -17,11 +17,6 @@ from rich.text import Text
 from codegraph.models import (
     CodeNode,
     Decision,
-    DecisionSource,
-    DecisionStatus,
-    DecisionTier,
-    find_decisions_for_file,
-    find_decisions_for_location,
     normalize_location_path,
     select_decisions,
 )
@@ -141,8 +136,7 @@ def load_decisions_sqlite(
             conn = connect(db_path)
         except sqlite3.Error as exc:
             console.print(f"[yellow]warn[/] Cannot open graph database {db_path}: {exc}")
-            samples = find_decisions_for_location(file_path, line)
-            return samples, ("line" if samples else "none")
+            return [], "none"
         try:
             # A line-level record is any record linked to the symbol that covers
             # this line. Querying the node range first stops an unrelated
@@ -173,15 +167,7 @@ def load_decisions_sqlite(
             conn.close()
     if rows:
         return rows, level
-    samples = find_decisions_for_location(file_path, line)
-    return samples, ("line" if samples else "none")
-
-
-def _all_decisions(conn) -> list[Decision]:
-    """Return every stored decision."""
-    from codegraph.storage import query_all_decisions
-
-    return query_all_decisions(conn)
+    return [], "none"
 
 
 def _parse_ts(value: object) -> datetime:
@@ -194,34 +180,18 @@ def _parse_ts(value: object) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def decision_from_dgraph(raw: dict) -> Decision:
-    """Convert a Dgraph Decision dict into the pydantic model."""
-    status = str(raw.get("status") or "accepted")
-    source = str(raw.get("source") or "adr")
-    tier = str(raw.get("tier") or DecisionTier.DECISION.value)
-    return Decision(
-        uid=str(raw.get("uid") or raw.get("decision_uid") or "dec"),
-        content=str(raw.get("content") or ""),
-        reason=str(raw.get("reason") or ""),
-        alternatives=list(raw.get("alternatives") or []),
-        status=DecisionStatus(status)
-        if status in DecisionStatus._value2member_map_
-        else DecisionStatus.ACCEPTED,
-        source=DecisionSource(source)
-        if source in DecisionSource._value2member_map_
-        else DecisionSource.ADR,
-        source_ref=str(raw.get("source_ref") or ""),
-        timestamp=_parse_ts(raw.get("timestamp")),
-        author=str(raw.get("author") or ""),
-        file_path=str(raw.get("file_path") or ""),
-        line=int(raw["line"]) if raw.get("line") is not None else None,
-        constraints=list(raw.get("constraints") or []),
-        confidence=float(raw.get("confidence") or 0.8),
-        category=str(raw.get("category") or "design"),
-        tier=DecisionTier(tier)
-        if tier in DecisionTier._value2member_map_
-        else DecisionTier.DECISION,
-    )
+def _load_all_decisions() -> list[Decision]:
+    """Load every decision from the local graph database, if it exists."""
+    from codegraph.storage import query_all_decisions
+
+    db_path = db_path_for_root(Path.cwd())
+    if not db_path.exists():
+        return []
+    conn = connect(db_path)
+    try:
+        return query_all_decisions(conn)
+    finally:
+        conn.close()
 
 
 def render_code_node_header(node: CodeNode) -> None:
@@ -352,70 +322,8 @@ def render_not_found(
     console.print("[dim]  codegraph decisions --file <path> --timeline[/]")
 
 
-def load_code_node_dgraph(file_path: str, line: int) -> CodeNode | None:
-    """Load covering CodeNode from Dgraph."""
-    from codegraph.graph import DgraphClient, DgraphConnectionError
-
-    try:
-        client = DgraphClient()
-        if not client.ping():
-            console.print(
-                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
-                "Run docker compose up -d first."
-            )
-            raise typer.Exit(code=3)
-        node = client.query_node_at(file_path, line)
-        client.close()
-    except DgraphConnectionError as exc:
-        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
-        raise typer.Exit(code=3) from exc
-
-    if not node:
-        return None
-    return CodeNode(
-        uid=str(node.get("node_uid") or node.get("uid") or ""),
-        kind=str(node.get("kind") or ""),
-        name=str(node.get("name") or ""),
-        file_path=str(node.get("file_path") or ""),
-        line_start=int(node.get("line_start") or 1),
-        line_end=int(node.get("line_end") or 1),
-        language=str(node.get("language") or ""),
-        parent_uid=node.get("parent_uid") or None,
-    )
-
-
-def _load_decisions_dgraph(file_path: str, line: int) -> list[Decision]:
-    """Load decisions from Dgraph for file:line."""
-    from codegraph.graph import DgraphClient, DgraphConnectionError
-
-    try:
-        client = DgraphClient()
-        if not client.ping():
-            console.print(
-                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
-                "Run docker compose up -d first."
-            )
-            raise typer.Exit(code=3)
-        raw_list = client.query_decisions_for(file_path, line)
-        client.close()
-    except DgraphConnectionError as exc:
-        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
-        raise typer.Exit(code=3) from exc
-
-    if raw_list:
-        return [decision_from_dgraph(item) for item in raw_list]
-    rows, _level = load_decisions_sqlite(file_path, line)
-    return rows
-
-
 def why_command(
     location: str,
-    backend: str = typer.Option(
-        "sqlite",
-        "--backend",
-        help="Graph backend: sqlite | dgraph",
-        metavar="BACKEND",
-    ),
     as_json: bool = typer.Option(
         False,
         "--json",
@@ -436,7 +344,6 @@ def why_command(
 
     Args:
         location: Location string like `src/auth/session.ts:42`.
-        backend: Storage backend, sqlite (default) or dgraph.
         as_json: Output JSON for editor extensions.
     """
     import json as jsonlib
@@ -450,30 +357,16 @@ def why_command(
             console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
 
-    if backend not in {"sqlite", "dgraph"}:
-        msg = f"Unknown backend: {backend} (use sqlite | dgraph)"
-        if as_json:
-            typer.echo(jsonlib.dumps({"error": msg}))
-        else:
-            console.print(f"[bold red]Invalid argument[/] {msg}")
-        raise typer.Exit(code=2)
-
-    hidden_records = 0
-    if backend == "dgraph":
-        node = load_code_node_dgraph(file_path, line)
-        decisions = _load_decisions_dgraph(file_path, line)
-        level = "line"
-    else:
-        node = load_code_node_sqlite(file_path, line)
-        raw_decisions, level = load_decisions_sqlite(
-            file_path, line, commit_sha=node.commit_sha if node else ""
-        )
-        decisions = select_decisions(
-            raw_decisions,
-            include_events=include_events,
-            include_dependency=include_dependency,
-        )
-        hidden_records = max(len(raw_decisions) - len(decisions), 0)
+    node = load_code_node_sqlite(file_path, line)
+    raw_decisions, level = load_decisions_sqlite(
+        file_path, line, commit_sha=node.commit_sha if node else ""
+    )
+    decisions = select_decisions(
+        raw_decisions,
+        include_events=include_events,
+        include_dependency=include_dependency,
+    )
+    hidden_records = max(len(raw_decisions) - len(decisions), 0)
 
     if as_json:
         payload = {
@@ -588,23 +481,12 @@ def decisions_command(
         include_dependency: Show dependency-bump decisions too.
         include_events: Show event-tier records too.
     """
-    rows, _level = load_decisions_sqlite(file, 0)
-    if not rows:
-        rows = find_decisions_for_file(file)
     prefix = normalize_location_path(file)
-    specific = [d for d in rows if d.file_path == prefix or d.file_path.startswith(prefix)]
-    if not specific:
-        # Fall back to any extracted decision so the timeline is still useful.
-        from codegraph.storage import query_all_decisions
-
-        db_path = db_path_for_root(Path.cwd())
-        if db_path.exists():
-            conn = connect(db_path)
-            try:
-                specific = query_all_decisions(conn)
-            finally:
-                conn.close()
-    rows = specific or rows
+    rows = [
+        d
+        for d in _load_all_decisions()
+        if d.file_path == prefix or d.file_path.startswith(prefix)
+    ]
     filtered = select_decisions(
         rows,
         include_events=include_events,

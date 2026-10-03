@@ -43,34 +43,17 @@ def filter_scope(decisions: list[Decision], scope: str) -> list[Decision]:
     return out
 
 
-def load_decisions(backend: str, *, include_events: bool = False) -> list[Decision]:
-    """Load records from SQLite or Dgraph, decisions only by default.
+def load_decisions(*, include_events: bool = False) -> list[Decision]:
+    """Load records from the local graph database, decisions only by default.
 
     Detecting contradictions between commit subjects is noise, so event-tier
     records are skipped unless explicitly requested.
     """
-    decisions = _load_all(backend)
-    return select_decisions(decisions, include_events=include_events)
+    return select_decisions(_load_all(), include_events=include_events)
 
 
-def _load_all(backend: str) -> list[Decision]:
-    """Load every record from the requested backend."""
-    if backend == "dgraph":
-        from codegraph.commands.why import decision_from_dgraph
-        from codegraph.graph import DgraphClient, DgraphConnectionError
-
-        try:
-            client = DgraphClient()
-            if not client.ping():
-                console.print("[bold red]Dgraph connection failed[/] run docker compose up -d")
-                raise typer.Exit(code=3)
-            raw = client.query_all_decisions()
-            client.close()
-            return [decision_from_dgraph(x) for x in raw]
-        except DgraphConnectionError as exc:
-            console.print(f"[bold red]Dgraph connection failed[/] {exc}")
-            raise typer.Exit(code=3) from exc
-
+def _load_all() -> list[Decision]:
+    """Load every stored record."""
     db = db_path_for_root(Path.cwd())
     if not db.exists():
         return []
@@ -151,17 +134,13 @@ def render_json(conflicts: list[Conflict], scope: str) -> None:
 def conflicts_command(
     scope: str = typer.Option(".", "--scope", help="Path scope, e.g. docs/adr", metavar="PATH"),
     format: str = typer.Option("table", "--format", help="table | json", metavar="FMT"),
-    backend: str = typer.Option("sqlite", "--backend", help="sqlite | dgraph", metavar="B"),
 ) -> None:
     """Detect contradictory accepted decisions in a scope."""
     if format not in {"table", "json"}:
         console.print("[bold red]Invalid argument[/] --format must be table or json")
         raise typer.Exit(code=2)
-    if backend not in {"sqlite", "dgraph"}:
-        console.print(f"[bold red]Invalid argument[/] Unknown backend: {backend}")
-        raise typer.Exit(code=2)
 
-    decisions = filter_scope(load_decisions(backend), scope)
+    decisions = filter_scope(load_decisions(), scope)
     conflicts = detect_all(decisions)
     if format == "json":
         render_json(conflicts, scope)

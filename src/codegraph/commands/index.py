@@ -14,7 +14,6 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from codegraph.decisions.sources import extract_all
 from codegraph.git.history import CommitInfo, GitHistory
 from codegraph.models import (
-    SAMPLE_DECISIONS,
     CodeNode,
     Decision,
     DecisionTier,
@@ -271,21 +270,28 @@ def load_decisions(
     llm_model: str = "llama3.2",
     progress_console: Console | None = None,
 ) -> list[Decision]:
-    """Extract real decisions; fall back to samples when empty.
+    """Extract decisions from the repository's own history and documents.
+
+    Nothing is fabricated: a repository whose commits and documents carry no
+    rationale produces no decisions, and the index says so.
 
     Args:
-        progress_console: Where human-readable warnings go; defaults to stdout
+        progress_console: Where human-readable output goes; defaults to stdout
             but is stderr when `--json` is in use so stdout stays parseable.
     """
     decisions = extract_all(
         repo_path, depth=depth, use_llm=use_llm, llm_model=llm_model
     )
-    if decisions:
-        return decisions
-    (progress_console or console).print(
-        "[yellow]warn[/] No commit/ADR decisions found; storing bundled sample decisions"
-    )
-    return list(SAMPLE_DECISIONS)
+    if not decisions:
+        (progress_console or console).print(
+            "[yellow]warn[/] No decisions found in commits, ADRs or CHANGELOG. "
+            "The graph will hold structure only."
+        )
+        (progress_console or console).print(
+            "[dim]Record why in a commit message ('... because ...'), an ADR, "
+            "or a CHANGELOG entry, then re-run index.[/]"
+        )
+    return decisions
 
 
 def _ingest_working_tree(
@@ -713,12 +719,6 @@ def index_command(
         help="How many recent commits to walk (default 100)",
         metavar="N",
     ),
-    backend: str = typer.Option(
-        "sqlite",
-        "--backend",
-        help="Graph backend: sqlite | dgraph",
-        metavar="BACKEND",
-    ),
     use_llm: bool = typer.Option(
         False,
         "--use-llm",
@@ -752,7 +752,6 @@ def index_command(
     Args:
         path: Repository root or subdirectory.
         depth: Max commits to walk.
-        backend: Storage backend, sqlite (default) or dgraph.
     """
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
     try:
@@ -761,18 +760,12 @@ def index_command(
         console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
 
-    if backend not in {"sqlite", "dgraph"}:
-        console.print(
-            f"[bold red]Invalid argument[/] Unknown backend: {backend} (use sqlite | dgraph)"
-        )
-        raise typer.Exit(code=2)
-
     root = target if target.is_dir() else target.parent
     # With --json the only thing on stdout must be the JSON document, so all
     # human-facing output goes to stderr.
     stream_console = Console(stderr=True) if as_json else console
     stream_console.print(
-        f"[bold cyan]Indexing[/] {target} ... [dim]backend={backend} depth={depth}[/]"
+        f"[bold cyan]Indexing[/] {target} ... [dim]depth={depth}[/]"
     )
     run_index_progress(INDEX_STEPS, progress_console=stream_console)
 
@@ -858,24 +851,19 @@ def index_command(
         progress_console=stream_console,
     )
 
-    if backend == "dgraph":
-        _write_dgraph(all_nodes, all_edges, decisions, progress_console=stream_console)
-        node_count, edge_count = len(all_nodes), len(all_edges)
-        decision_count = len(decisions)
-    else:
-        try:
-            guard_node_collapse(len(all_nodes), previous_nodes, replace=replace)
-        except GraphShrinkError as exc:
-            stream_console.print(f"[bold red]Refusing to write[/] {exc}")
-            stream_console.print(
-                "[dim]Existing graph left untouched. Re-run with --full to rebuild "
-                "from scratch.[/]"
-            )
-            raise typer.Exit(code=4) from exc
-        links = bind_decisions_to_lines(root, decisions, all_nodes)
-        node_count, edge_count, decision_count = write_sqlite_graph(
-            db_path, all_nodes, all_edges, decisions, links, replace=replace
+    try:
+        guard_node_collapse(len(all_nodes), previous_nodes, replace=replace)
+    except GraphShrinkError as exc:
+        stream_console.print(f"[bold red]Refusing to write[/] {exc}")
+        stream_console.print(
+            "[dim]Existing graph left untouched. Re-run with --full to rebuild "
+            "from scratch.[/]"
         )
+        raise typer.Exit(code=4) from exc
+    links = bind_decisions_to_lines(root, decisions, all_nodes)
+    node_count, edge_count, decision_count = write_sqlite_graph(
+        db_path, all_nodes, all_edges, decisions, links, replace=replace
+    )
 
     if head_sha:
         # Record the persisted size so a truncated graph is detected next run.
@@ -893,7 +881,6 @@ def index_command(
             jsonlib.dumps(
                 {
                     "root": str(root),
-                    "backend": backend,
                     "commits": commit_count,
                     "nodes": node_count,
                     "edges": edge_count,
@@ -910,50 +897,11 @@ def index_command(
     console.print(f"  · Nodes: [bold]{node_count}[/]")
     console.print(f"  · Edges: [bold]{edge_count}[/]")
     console.print(f"  · Decisions: [bold]{decision_count}[/]")
-    if backend == "dgraph":
-        console.print(
-            "  · Dgraph UI: "
-            "[link=http://localhost:8080/?latest]http://localhost:8080/?latest[/link]"
-        )
-    else:
-        console.print(f"  · Database: [bold]{db_path_for_root(root)}[/]")
+    console.print(f"  · Database: [bold]{db_path_for_root(root)}[/]")
     console.print("[dim]Next: codegraph why <file>:<line>  to view a decision card[/]")
 
 
-def _write_dgraph(
-    nodes: list[CodeNode],
-    edges: list[Edge],
-    decisions: list[Decision],
-    progress_console: Console | None = None,
-) -> None:
-    """Write the graph to Dgraph when requested."""
-    from codegraph.graph import DgraphClient, DgraphConnectionError
-
-    out = progress_console or console
-    try:
-        client = DgraphClient()
-        if not client.ping():
-            out.print(
-                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
-                "Run docker compose up -d first."
-            )
-            raise typer.Exit(code=3)
-        client.init_schema()
-        for node in nodes:
-            client.upsert_node(node)
-        for edge in edges:
-            client.upsert_edge(edge)
-        for decision in decisions:
-            client.upsert_decision(decision)
-        client.close()
-    except typer.Exit:
-        raise
-    except DgraphConnectionError as exc:
-        out.print(f"[bold red]Dgraph connection failed[/] {exc}")
-        raise typer.Exit(code=3) from exc
-
-
-app = typer.Typer(help="Index a codebase from Git history (tree-sitter + SQLite/Dgraph)")
+app = typer.Typer(help="Index a codebase from Git history (tree-sitter + SQLite)")
 
 if __name__ == "__main__":
     app()

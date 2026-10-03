@@ -27,9 +27,11 @@ I am 15 and mostly self-taught. When I do not understand a design choice, I cann
 
 I learned that parsing code for real is different from writing a toy tokenizer. tree-sitter gives a solid AST, but mapping functions, methods, classes, and calls into stable IDs and edges is where design decisions matter. Supporting six languages taught me to keep a narrow `BaseParser` interface and resist language-specific special cases leaking upward. Java methods, Go functions, Rust `impl` blocks, and C++ declarators all needed different name extraction — yet the storage layer only ever sees `kind`, `name`, and a line range.
 
-Working with graphs taught me storage trade-offs. SQLite is perfect for a local MVP and for tests that must stay fast. Dgraph is the right long-term store for multi-hop questions — and its upsert model is less forgiving than SQL. I also shipped a small FastAPI + Cytoscape UI and a VSCode extension that shells out to `codegraph why --json`, which taught me more about product packaging than about algorithms: TypeScript builds, Webview HTML, and a stable JSON contract for editors.
+Working with graphs taught me storage trade-offs. SQLite is perfect for a local MVP and for tests that must stay fast — one file, no server, no Docker. I also shipped a small FastAPI + Cytoscape UI and a VSCode extension that shells out to `codegraph why --json`, which taught me more about product packaging than about algorithms: TypeScript builds, Webview HTML, and a stable JSON contract for editors.
 
-Finally I learned honesty under deadline pressure. A student project can easily overclaim. I kept sample decisions labeled, measured a real index run on this repository, and wrote status numbers only after running `pytest -q` and `codegraph --help`.
+The hardest lesson came from deleting code. I had built an optional Dgraph backend and advertised it; an audit showed `--backend dgraph` returned sample data in one path, was silently ignored in another, and crashed in a third. I removed all 503 lines rather than keep a feature I could not stand behind ([ADR-006](adr/006-drop-dgraph-backend.md)).
+
+Finally I learned honesty under deadline pressure. A student project can easily overclaim. I removed the bundled sample decisions so nothing is fabricated, measured a real index run, and wrote status numbers only after running `pytest -q` and `codegraph --help`.
 
 ### How I built it
 
@@ -50,7 +52,7 @@ Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD 
 
 **Six grammars, one contract.** Each language names functions and calls differently. I standardized on `parse_text` + call-site tuples so edge extraction runs after merging nodes — otherwise parallel per-file parsing drops cross-file calls. Fixtures for `.java` / `.go` / `.rs` / `.cpp` lock that contract in tests.
 
-**Dgraph upserts.** Business keys (`node_uid`) must map onto blank nodes and `uid(var)` updates without duplicating history versions. Live clusters are optional; the client and `--backend dgraph` exist, but production hardening is still open.
+**Dgraph upserts.** My first storage plan was an optional Dgraph backend behind `--backend dgraph`, and it cost me the most valuable week of the project. The flag shipped before the backend worked: one path printed sample decisions instead of the query result, `serve` validated the flag and then ignored it, and `export` raised `AttributeError` on every call. I removed all 503 lines ([ADR-006](adr/006-drop-dgraph-backend.md)). The lesson: an unfinished feature behind a flag still has to be honest, and deleting it is cheaper than defending it.
 
 **Noise in decision extraction.** Rules first; LLM only when a commit lacks rationale keywords, and LLM confidence is capped at 0.7 so it cannot outrank explicit reasoning. When Ollama is offline the CLI warns and continues — never fail the whole index. Every record is also graded: only records that state a reason or a rejected alternative are shown as decisions; commit subjects stay as `event` history. On Express.js that is **5 decisions out of 204 records** — a small, checkable number instead of an inflated one.
 
@@ -60,11 +62,11 @@ Coding assistants are brilliant at generating code in front of them, but they ca
 
 ### What's next
 
-Only unfinished work: harden the Dgraph backend against a live cluster, richer conflict rules, publish the VSCode extension to the Marketplace, and continue performance tuning on larger monorepos. I would also like CI on every OS matrix to stay green with coverage reports. No vaporware — if it is not in the repo or tests, it is not in this story.
+Only unfinished work: richer conflict rules, publishing the VSCode extension to the Marketplace, and performance tuning on larger monorepos. I would also like CI on every OS matrix to stay green with coverage reports. No vaporware — if it is not in the repo or tests, it is not in this story.
 
 ## 3. Built with (tags)
 
-Python, Typer, Rich, pydantic, tree-sitter, tree-sitter-typescript, tree-sitter-python, tree-sitter-java, tree-sitter-go, tree-sitter-rust, tree-sitter-cpp, GitPython, SQLite, FastAPI, Uvicorn, Cytoscape.js, httpx, Ollama, Dgraph, pydgraph, pytest, TypeScript, VS Code Extension API, GitHub Actions, MIT License
+Python, Typer, Rich, pydantic, tree-sitter, tree-sitter-typescript, tree-sitter-python, tree-sitter-java, tree-sitter-go, tree-sitter-rust, tree-sitter-cpp, GitPython, SQLite, FastAPI, Uvicorn, Cytoscape.js, httpx, Ollama, pytest, TypeScript, VS Code Extension API, GitHub Actions, MIT License
 
 *(JS uses the TypeScript grammar; VS Code extension ships as `codegraph-vscode-0.1.0.vsix`.)*
 
@@ -77,8 +79,8 @@ Python, Typer, Rich, pydantic, tree-sitter, tree-sitter-typescript, tree-sitter-
 
 ## 5. Likely Q&A
 
-**1. Why Dgraph instead of Neo4j?**  
-Dgraph is a distributed native graph with DQL and upsert blocks, and it matches our multi-hop “decision → code → commit” shape. Neo4j is excellent, but we wanted Apache-2.0 friendly ops and a simple Docker Compose path. SQLite stays default so the demo never requires either.
+**1. Why SQLite and not a graph database?**  
+Because no shipped query needs one. SQLite gives a zero-setup local store, fast tests and honest time travel, and every query the CLI actually makes is a scoped lookup. I did build the Dgraph path first and removed it: it was 503 lines of untested client code, `--backend dgraph` returned sample data on one path and was ignored on another, and nothing in the CLI performs a multi-hop traversal. A native graph store comes back when a real query justifies it — [ADR-006](adr/006-drop-dgraph-backend.md).
 
 **2. How does time travel work?**  
 Every CodeNode version stores `valid_from` / `valid_to` from Git commits. `graph --at DATE` keeps nodes where `valid_from <= DATE` and `valid_to` is null or `>= DATE`. Edges count only when both endpoints are live at that date.
@@ -101,7 +103,7 @@ Those tools excel at vulnerability and deep semantic queries. CodeGraph optimize
 Correct historical edges. Naive per-file parsing drops cross-file calls and time filters counted dead edges. The fix was merge-then-extract edges and live-endpoint edge counts.
 
 **9. If you started over, what would you change?**  
-I would define the SQLite/Dgraph schema for versioned nodes on day one, and add `--json` earlier so editors and tests share one contract.
+I would define the versioned-node schema on day one, and add `--json` earlier so editors and tests share one contract. I would also not put an unfinished backend behind a flag: either it works in a test, or it does not ship.
 
 **10. Any commercial path?**  
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.

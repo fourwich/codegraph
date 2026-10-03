@@ -7,10 +7,9 @@ const execFileAsync = promisify(execFile);
 export async function runWhy(
   cliPath: string,
   file: string,
-  line: number,
-  backend: string
+  line: number
 ): Promise<WhyResult | null> {
-  const args = ["why", `${file}:${line}`, "--backend", backend, "--json"];
+  const args = ["why", `${file}:${line}`, "--json"];
   const { stdout } = await execFileAsync(cliPath, args, {
     maxBuffer: 8 * 1024 * 1024,
     encoding: "utf8",
@@ -20,10 +19,9 @@ export async function runWhy(
 
 export async function runIndex(
   cliPath: string,
-  workspace: string,
-  backend: string
+  workspace: string
 ): Promise<IndexResult> {
-  const args = ["index", workspace, "--backend", backend, "--json"];
+  const args = ["index", workspace, "--json"];
   const { stdout } = await execFileAsync(cliPath, args, {
     maxBuffer: 16 * 1024 * 1024,
     encoding: "utf8",

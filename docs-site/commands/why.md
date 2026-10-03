@@ -3,7 +3,7 @@
 Show the decision provenance card for a source line.
 
 ```bash
-codegraph why <file>:<line> [--backend sqlite|dgraph] [--json]
+codegraph why <file>:<line> [--json]
 ```
 
 ## Example

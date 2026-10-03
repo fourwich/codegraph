@@ -8,9 +8,3 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest -q
 ```
-
-Optional Docker for Dgraph:
-
-```bash
-docker compose up -d
-```

@@ -139,14 +139,10 @@ def diff_command(
     to_ref: str = typer.Argument(..., help="End version (tag / sha / YYYY-MM-DD)"),
     scope: str = typer.Option(".", "--scope", help="Path prefix scope", metavar="PATH"),
     format: str = typer.Option("table", "--format", help="table | json", metavar="FMT"),
-    backend: str = typer.Option("sqlite", "--backend", help="sqlite | dgraph", metavar="B"),
 ) -> None:
     """Show decision changes between two versions."""
     if format not in {"table", "json"}:
-        console.print(f"[bold red]Invalid argument[/] --format must be table or json")
-        raise typer.Exit(code=2)
-    if backend not in {"sqlite", "dgraph"}:
-        console.print(f"[bold red]Invalid argument[/] Unknown backend: {backend}")
+        console.print("[bold red]Invalid argument[/] --format must be table or json")
         raise typer.Exit(code=2)
 
     root = Path.cwd()
@@ -160,10 +156,6 @@ def diff_command(
     if from_ts > to_ts:
         console.print("[bold red]Invalid argument[/] from must be earlier than to")
         raise typer.Exit(code=2)
-
-    if backend == "dgraph":
-        console.print("[bold red]Dgraph backend not implemented for diff yet[/]")
-        raise typer.Exit(code=3)
 
     db_path = db_path_for_root(root)
     if not db_path.exists():

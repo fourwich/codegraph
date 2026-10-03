@@ -1,4 +1,4 @@
-﻿"""CodeGraph Typer CLI entrypoint."""
+"""CodeGraph Typer CLI entrypoint."""
 
 from __future__ import annotations
 
@@ -18,7 +18,10 @@ app = typer.Typer(
     help=(
         "CodeGraph: turn code structure, history, and design decisions into one "
         "queryable graph.\n\n"
-        "MVP stage ships a full command flow on bundled sample data and local graph stores."
+        "Answers are read from the repository's own commits, ADRs and CHANGELOG; "
+        "nothing is fabricated. Records that state a reason or a rejected "
+        "alternative are decisions, everything else is history behind "
+        "--include-events."
     ),
     add_completion=True,
     no_args_is_help=True,
@@ -49,19 +52,19 @@ def main(
 
 app.command(
     name="index",
-    help="Parse code + ingest Git history + write the graph (tree-sitter + SQLite/Dgraph)",
+    help="Parse code + ingest Git history + write the graph (tree-sitter + SQLite)",
     rich_help_panel="Core commands",
 )(index_command)
 
 app.command(
     name="why",
-    help="Show the decision card behind a source line, e.g. why src/auth/session.ts:42",
+    help="Show the decision card behind a source line, e.g. why src/app.py:42",
     rich_help_panel="Core commands",
 )(why_command)
 
 app.command(
     name="graph",
-    help="Print a historical code-graph snapshot, e.g. graph --at 2024-11-02 --scope src",
+    help="Print a historical code-graph snapshot, e.g. graph --at 2026-09-23 --scope src",
     rich_help_panel="Core commands",
 )(graph_command)
 

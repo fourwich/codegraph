@@ -9,7 +9,6 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
-from codegraph.commands.why import decision_from_dgraph
 from codegraph.models import Decision, normalize_location_path, select_decisions
 from codegraph.storage import (
     connect,
@@ -136,53 +135,33 @@ def create_app() -> FastAPI:
     def api_graph(
         at: str = Query(default=""),
         scope: str = Query(default="."),
-        backend: str = Query(default="sqlite"),
     ) -> JSONResponse:
         """Return graph payload valid at a date."""
-        date = _parse_date(at)
-        if backend == "dgraph":
-            data = _load_graph_dgraph(date, scope)
-        else:
-            data = _load_graph_sqlite(date, scope)
-        return JSONResponse(data)
+        return JSONResponse(_load_graph_sqlite(_parse_date(at), scope))
 
     @app.get("/api/why")
     def api_why(
         file: str = Query(...),
         line: int = Query(...),
-        backend: str = Query(default="sqlite"),
     ) -> JSONResponse:
         """Return node + decisions for a file:line."""
         path = normalize_location_path(file)
         node = None
         decisions: list[Decision] = []
-        if backend == "dgraph":
-            from codegraph.graph import DgraphClient, DgraphConnectionError
-
+        db_path = _sqlite_path()
+        if db_path.exists():
+            conn = connect(db_path)
             try:
-                client = DgraphClient()
-                raw_node = client.query_node_at(path, line)
-                raw_decisions = client.query_decisions_for(path, line)
-                client.close()
-            except DgraphConnectionError as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
-            decisions = [decision_from_dgraph(item) for item in raw_decisions]
-            node = raw_node
-        else:
-            db_path = _sqlite_path()
-            if db_path.exists():
-                conn = connect(db_path)
-                try:
-                    from codegraph.storage import find_node_at_line
+                from codegraph.storage import find_node_at_line
 
-                    found = find_node_at_line(conn, path, line)
-                    node = _node_json(found) if found else None
-                    decisions = query_decisions_for_line(conn, path, line)
-                    if not decisions:
-                        decisions = query_decisions_for_file(conn, path)
-                    decisions = select_decisions(decisions)
-                finally:
-                    conn.close()
+                found = find_node_at_line(conn, path, line)
+                node = _node_json(found) if found else None
+                decisions = query_decisions_for_line(conn, path, line)
+                if not decisions:
+                    decisions = query_decisions_for_file(conn, path)
+                decisions = select_decisions(decisions)
+            finally:
+                conn.close()
         return JSONResponse(
             {
                 "file": path,
@@ -195,43 +174,29 @@ def create_app() -> FastAPI:
     @app.get("/api/decisions")
     def api_decisions(
         file: str = Query(default=""),
-        backend: str = Query(default="sqlite"),
     ) -> JSONResponse:
         """Return decision timeline for a file or all decisions."""
-        if backend == "dgraph":
-            from codegraph.graph import DgraphClient, DgraphConnectionError
-
+        db_path = _sqlite_path()
+        decisions: list[Decision] = []
+        if db_path.exists():
+            conn = connect(db_path)
             try:
-                client = DgraphClient()
-                raw = client.query_all_decisions()
-                client.close()
-            except DgraphConnectionError as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
-            decisions = select_decisions([decision_from_dgraph(item) for item in raw])
-        else:
-            db_path = _sqlite_path()
-            decisions = []
-            if db_path.exists():
-                conn = connect(db_path)
-                try:
-                    decisions = (
-                        query_decisions_for_file(conn, normalize_location_path(file))
-                        if file
-                        else query_all_decisions(conn)
-                    )
-                    decisions = select_decisions(decisions)
-                finally:
-                    conn.close()
+                decisions = (
+                    query_decisions_for_file(conn, normalize_location_path(file))
+                    if file
+                    else query_all_decisions(conn)
+                )
+                decisions = select_decisions(decisions)
+            finally:
+                conn.close()
         return JSONResponse({"decisions": [_decision_json(d) for d in decisions]})
 
     @app.get("/api/timeline")
     def api_timeline(
         scope: str = Query(default="."),
-        backend: str = Query(default="sqlite"),
     ) -> JSONResponse:
         """Return commit-ish date ticks for the time slider."""
-        ticks = _timeline_sqlite(scope)
-        return JSONResponse({"ticks": ticks})
+        return JSONResponse({"ticks": _timeline_sqlite(scope)})
 
     return app
 
@@ -265,42 +230,6 @@ def _timeline_sqlite(scope: str) -> list[str]:
         conn.close()
 
 
-def _load_graph_dgraph(at: datetime, scope: str) -> dict[str, Any]:
-    """Load graph payload from Dgraph."""
-    from codegraph.graph import DgraphClient, DgraphConnectionError
-
-    try:
-        client = DgraphClient()
-        payload = client.query_graph_at(at.date().isoformat(), scope)
-        raw_decisions = client.query_all_decisions()
-        client.close()
-    except DgraphConnectionError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    nodes = [
-        {
-            "uid": n.get("node_uid") or n.get("uid"),
-            "kind": n.get("kind"),
-            "name": n.get("name"),
-            "file_path": n.get("file_path"),
-            "line_start": n.get("line_start"),
-            "line_end": n.get("line_end"),
-            "language": n.get("language", ""),
-            "commit_sha": n.get("commit_sha", ""),
-        }
-        for n in payload.get("nodes") or []
-    ]
-    decisions = [decision_from_dgraph(item) for item in raw_decisions]
-    return {
-        "nodes": nodes,
-        "edges": [],
-        "decisions": [_decision_json(d) for d in decisions[:50]],
-        "stats": {
-            "nodes": len(nodes),
-            "edges": int(payload.get("edge_count") or 0),
-            "decisions": int(payload.get("decision_count") or 0),
-        },
-    }
 
 
 app = create_app()

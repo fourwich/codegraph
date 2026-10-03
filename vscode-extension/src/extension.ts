@@ -7,10 +7,6 @@ function cliPath(): string {
   return vscode.workspace.getConfiguration("codegraph").get<string>("cliPath") || "codegraph";
 }
 
-function backend(): string {
-  return vscode.workspace.getConfiguration("codegraph").get<string>("backend") || "sqlite";
-}
-
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("codegraph.showDecision", async () => {
@@ -28,7 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
         new vscode.Range(snippetStart, 0, snippetEnd, 0)
       );
       try {
-        const result = await runWhy(cliPath(), file, line, backend());
+        const result = await runWhy(cliPath(), file, line);
         if (!result) {
           void vscode.window.showWarningMessage("CodeGraph: no result from CLI");
           return;
@@ -64,7 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       try {
-        const result = await runIndex(cliPath(), root, backend());
+        const result = await runIndex(cliPath(), root);
         void vscode.window.showInformationMessage(
           `CodeGraph: indexed ${result.nodes} nodes, ${result.decisions} decisions`
         );

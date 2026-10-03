@@ -19,13 +19,8 @@ from codegraph.storage import (
 console = Console()
 
 
-def load_context_data(
-    scope: str, backend: str
-) -> tuple[list, list[Decision]]:
+def load_context_data(scope: str) -> tuple[list, list[Decision]]:
     """Load nodes and decisions for the export scope."""
-    if backend == "dgraph":
-        return _load_dgraph(scope)
-
     db_path = db_path_for_root(Path.cwd())
     if not db_path.exists():
         return [], []
@@ -40,31 +35,6 @@ def load_context_data(
         return nodes, decisions
     finally:
         conn.close()
-
-
-def _load_dgraph(scope: str) -> tuple[list, list[Decision]]:
-    """Load snapshot data from Dgraph."""
-    from codegraph.commands.why import decision_from_dgraph
-    from codegraph.graph import DgraphClient, DgraphConnectionError
-
-    try:
-        client = DgraphClient()
-        if not client.ping():
-            console.print(
-                "[bold red]Dgraph connection failed[/] Cannot reach alpha. "
-                "Run docker compose up -d first."
-            )
-            raise typer.Exit(code=3)
-        payload = client.query_graph_at(datetime.now(timezone.utc).date().isoformat(), scope)
-        raw_decisions = client.query_all_decisions()
-        client.close()
-    except DgraphConnectionError as exc:
-        console.print(f"[bold red]Dgraph connection failed[/] {exc}")
-        raise typer.Exit(code=3) from exc
-
-    nodes = payload.get("nodes") or []
-    decisions = select_decisions([decision_from_dgraph(item) for item in raw_decisions])
-    return nodes, decisions
 
 
 def build_context_markdown(nodes: list, decisions: list[Decision], scope: str) -> str:
@@ -136,12 +106,6 @@ def export_command(
         help="Path scope, e.g. src or src/auth",
         metavar="PATH",
     ),
-    backend: str = typer.Option(
-        "sqlite",
-        "--backend",
-        help="Graph backend: sqlite | dgraph",
-        metavar="BACKEND",
-    ),
     output: Path = typer.Option(
         Path(".codegraph/context.md"),
         "--output",
@@ -154,19 +118,13 @@ def export_command(
     Args:
         for_ai: Must be true to write the pack (explicit intent).
         scope: Path prefix scope.
-        backend: Storage backend, sqlite (default) or dgraph.
         output: Destination markdown file.
     """
     if not for_ai:
         console.print("[bold red]Invalid argument[/] Use --for-ai to export a context pack")
         raise typer.Exit(code=2)
-    if backend not in {"sqlite", "dgraph"}:
-        console.print(
-            f"[bold red]Invalid argument[/] Unknown backend: {backend} (use sqlite | dgraph)"
-        )
-        raise typer.Exit(code=2)
 
-    nodes, decisions = load_context_data(scope, backend)
+    nodes, decisions = load_context_data(scope)
     text = build_context_markdown(nodes, decisions, scope)
     output = output.expanduser()
     output.parent.mkdir(parents=True, exist_ok=True)

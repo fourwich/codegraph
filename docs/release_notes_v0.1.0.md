@@ -1,5 +1,10 @@
 # CodeGraph v0.1.0 (alpha)
 
+> Historical release notes. Some of what this release shipped (bundled sample
+> decisions, the optional Dgraph backend, the `--backend` flag) has since been
+> removed — see [ADR-006](adr/006-drop-dgraph-backend.md) and the
+> [CHANGELOG](../CHANGELOG.md).
+
 First public alpha of CodeGraph — a decision memory layer that turns code structure, git history, and design decisions into one queryable graph.
 
 ## What's in this release

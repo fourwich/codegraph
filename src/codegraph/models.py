@@ -1,7 +1,8 @@
-"""Core data models and bundled sample decisions for CodeGraph.
+"""Core data models for CodeGraph.
 
-Structure comes from tree-sitter; decisions may come from git/ADR extraction
-or bundled samples when no repository decisions exist yet.
+Structure comes from tree-sitter; decisions come from Git history, ADRs and
+CHANGELOG files. Nothing is fabricated: if a repository records no rationale,
+CodeGraph reports that instead of inventing a decision.
 """
 
 from __future__ import annotations
@@ -150,129 +151,6 @@ def make_uid(file_path: str, kind: str, name: str, line_start: int, commit_sha: 
         return f"{base}::{commit_sha[:12]}"
     return base
 
-
-# Sample decisions matched by exact file:line (fallback demo data)
-SAMPLE_DECISIONS: list[Decision] = [
-    Decision(
-        uid="dec-001",
-        content="Session tokens use stateful JWT with a server-side denylist",
-        reason=(
-            "Login sessions must support sign-out everywhere immediately. "
-            "Pure stateless JWT cannot revoke instantly, while a full server session "
-            "forces every gateway hop to hit the DB. Compromise: JWT carries jti and "
-            "the gateway caches a denylist."
-        ),
-        alternatives=[
-            "Pure stateless JWT (rejected: cannot kick sessions immediately)",
-            "Full server-side session (rejected: gateway DB cost)",
-        ],
-        status=DecisionStatus.ACCEPTED,
-        source=DecisionSource.PR,
-        source_ref="PR #48 · Issue #31 · ADR-003",
-        timestamp=datetime(2024, 11, 2, 15, 30, 0),
-        author="chen@example.com",
-        file_path="src/auth/session.ts",
-        line=42,
-        constraints=[
-            "Keep compatibility with legacy mobile client headers",
-            "Auth P99 latency < 5ms",
-            "Key rotation must not drop active sessions",
-        ],
-        confidence=0.92,
-    ),
-    Decision(
-        uid="dec-002",
-        content="bcrypt cost factor fixed at 12",
-        reason=(
-            "On current CI machines and login QPS, 12 rounds take about 80ms — "
-            "enough for brute-force resistance without making login feel slow."
-        ),
-        alternatives=[
-            "Argon2id (rejected: hash migration cost)",
-            "PBKDF2 (rejected: weaker library conventions)",
-        ],
-        status=DecisionStatus.ACCEPTED,
-        source=DecisionSource.ADR,
-        source_ref="ADR-003",
-        timestamp=datetime(2024, 11, 2, 16, 10, 0),
-        author="security@example.com",
-        file_path="src/auth/password.ts",
-        line=18,
-        constraints=[
-            "Stay compatible with existing User.password_hash format",
-            "Login P95 < 150ms",
-        ],
-        confidence=0.88,
-    ),
-    Decision(
-        uid="dec-003",
-        content="Cache keys always carry a tenant prefix",
-        reason=(
-            "A multi-tenant deploy once produced cross-tenant dirty reads. "
-            "All Redis keys must start with tenant:{id}: and the write path enforces it."
-        ),
-        alternatives=["Prefix only in business code (rejected: easy to forget)"],
-        status=DecisionStatus.ACCEPTED,
-        source=DecisionSource.ISSUE,
-        source_ref="Issue #77",
-        timestamp=datetime(2025, 1, 18, 10, 0, 0),
-        author="ops@example.com",
-        file_path="src/cache/keys.ts",
-        line=7,
-        constraints=["Bare keys are forbidden", "Dual-write old keys for 7 days in gray release"],
-        confidence=0.95,
-    ),
-    Decision(
-        uid="dec-004",
-        content="Pagination uses a (created_at, id) cursor instead of offset",
-        reason=(
-            "Deep offset pagination on the order list degraded P99 to 2s past 100k rows; "
-            "cursor pagination stays around 40ms."
-        ),
-        alternatives=["offset/limit (rejected: unstable deep pages)"],
-        status=DecisionStatus.ACCEPTED,
-        source=DecisionSource.COMMIT,
-        source_ref="commit b4c12aa",
-        timestamp=datetime(2025, 3, 4, 9, 20, 0),
-        author="backend@example.com",
-        file_path="src/api/orders.ts",
-        line=63,
-        constraints=["Keep the load-more UX unchanged on the frontend"],
-        confidence=0.84,
-    ),
-    Decision(
-        uid="dec-005",
-        content="Retire the V1 dual-write protocol",
-        reason=(
-            "V1 dual-write had no traffic after gray release ended; keeping it "
-            "raised schema compatibility cost with no benefit."
-        ),
-        alternatives=["Keep dual-write forever (rejected: maintenance cost)"],
-        status=DecisionStatus.SUPERSEDED,
-        source=DecisionSource.PR,
-        source_ref="PR #120 (supersedes ADR-001 dual-write)",
-        timestamp=datetime(2025, 5, 9, 14, 0, 0),
-        author="arch@example.com",
-        file_path="src/api/orders.ts",
-        line=63,
-        constraints=["Confirm zero V1 write traffic in monitoring before removal"],
-        confidence=0.75,
-    ),
-]
-
-
-def find_decisions_for_location(file_path: str, line: int) -> list[Decision]:
-    """Return sample decisions bound to a file:line."""
-    return [d for d in SAMPLE_DECISIONS if d.matches_location(file_path, line)]
-
-
-def find_decisions_for_file(file_path: str) -> list[Decision]:
-    """Return sample decisions bound to a file (or path prefix)."""
-    prefix = normalize_location_path(file_path)
-    matched = [
-        d for d in SAMPLE_DECISIONS if d.file_path == prefix or d.file_path.startswith(prefix)
-    ]
-    return sorted(matched, key=lambda d: d.timestamp)
 
 class DecisionChange(BaseModel):
     """A decision delta between two snapshots."""

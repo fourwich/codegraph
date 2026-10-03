@@ -26,7 +26,7 @@ of code to the design decisions that shaped it.
 ```
 Source files (.ts / .py)  ──▶  tree-sitter parsers  ──▶  CodeNode + Edge
                                                               │
-Git history (all commits) ──▶  GitHistory          ──▶  SQLite / Dgraph
+Git history (all commits) ──▶  GitHistory          ──▶  SQLite
                                                               │
 Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
                                                               │
@@ -100,7 +100,6 @@ additionally requires opposite terms — being close in time is not a contradict
 |---|---|---|
 | Parsing | tree-sitter | Multi-language, incremental, industry standard |
 | Git | GitPython | Read-only access to real Git history |
-| Graph DB | Dgraph | Native graph queries for multi-hop decision tracing |
 | CLI | Typer + Rich | Fast CLI, readable terminal output |
 | Models | pydantic | Typed data models |
 | Storage | SQLite | Default backend; zero-config, local-first |
@@ -126,9 +125,8 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |
 | ✅ Done | Optional Ollama LLM extraction hook (`--use-llm`) |
-| 🚧 In progress | Dgraph backend (client + `--backend dgraph` implemented; live cluster optional) |
-| ⬜ Planned | Dgraph multi-hop query hardening |
 | ⬜ Planned | VS Code Marketplace publish |
+| ⬜ Removed | Dgraph backend — see [ADR-006](adr/006-drop-dgraph-backend.md); revisit only when a shipped query needs multi-hop traversal |
 
 ---
 
@@ -137,7 +135,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | Version | Scope |
 |---|---|
 | v0.1.0 | Stabilize CLI + SQLite + tests |
-| v0.2.0 | Dgraph production hardening |
+| v0.2.0 | Decision tiers, governed binding, conflict precision |
 | v0.3.0 | Richer conflict rules |
 | v0.4.0 | Marketplace release for VSCode extension |
 | v0.5.0 | Larger-repo performance tuning |

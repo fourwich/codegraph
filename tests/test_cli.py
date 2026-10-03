@@ -1,4 +1,4 @@
-"""CodeGraph CLI tests: help, why, index, graph, and Dgraph flags."""
+"""CodeGraph CLI tests: help, why, index, graph and export."""
 
 from __future__ import annotations
 
@@ -23,14 +23,12 @@ def test_help_lists_four_commands() -> None:
     assert "decisions" in result.stdout
 
 
-def test_why_known_location_shows_decision_card() -> None:
-    """Known file:line should render decision card fields."""
+def test_why_known_location_has_no_fabricated_decision() -> None:
+    """A location with no recorded rationale reports that, not a sample card."""
     result = runner.invoke(app, ["why", "src/auth/session.ts:42"])
-    assert result.exit_code == 0
-    assert "[Decision]" in result.stdout
-    assert "stateful JWT" in result.stdout
-    assert "[Alternatives]" in result.stdout
-    assert "[Confidence]" in result.stdout
+    assert result.exit_code == 1
+    assert "No decision record found" in result.stdout
+    assert "stateful JWT" not in result.stdout
 
 
 def test_why_bad_format_friendly_error() -> None:
@@ -78,52 +76,6 @@ def test_graph_table_and_date_validation() -> None:
     bad = runner.invoke(app, ["graph", "--at", "not-a-date", "--scope", "src"])
     assert bad.exit_code == 2
     assert "Date" in bad.stdout
-
-
-def test_index_dgraph_backend_connection_failure(tmp_path: Path) -> None:
-    """index --backend dgraph should exit 3 when Dgraph is unreachable."""
-    sample = tmp_path / "hello.py"
-    sample.write_text("def greet():\n    return 1\n", encoding="utf-8")
-    result = runner.invoke(
-        app,
-        ["index", str(tmp_path), "--backend", "dgraph"],
-        env={"DGRAPH_ALPHA": "localhost:59999"},
-    )
-    assert result.exit_code == 3
-    assert "Dgraph connection failed" in result.stdout
-
-
-def test_why_dgraph_backend_flag_parsed() -> None:
-    """why should accept --backend dgraph and still parse location args."""
-    result = runner.invoke(
-        app,
-        ["why", "badformat", "--backend", "dgraph"],
-        env={"DGRAPH_ALPHA": "localhost:59999"},
-    )
-    assert result.exit_code == 2
-    assert "Invalid argument" in result.stdout
-
-
-def test_graph_dgraph_backend_connection_failure() -> None:
-    """graph --backend dgraph should exit 3 when Dgraph is down."""
-    result = runner.invoke(
-        app,
-        ["graph", "--at", "2026-09-23", "--scope", "src", "--backend", "dgraph"],
-        env={"DGRAPH_ALPHA": "localhost:59999"},
-    )
-    assert result.exit_code == 3
-    assert "Dgraph connection failed" in result.stdout
-
-
-def test_conflicts_dgraph_backend_connection_failure() -> None:
-    """conflicts --backend dgraph should exit 3 when Dgraph is down."""
-    result = runner.invoke(
-        app,
-        ["conflicts", "--scope", "src", "--backend", "dgraph"],
-        env={"DGRAPH_ALPHA": "localhost:59999"},
-    )
-    assert result.exit_code == 3
-    assert "Dgraph connection failed" in result.stdout
 
 
 def test_export_for_ai_writes_pack(tmp_path: Path) -> None:
