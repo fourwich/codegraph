@@ -17,7 +17,6 @@ from codegraph.storage import (
     list_edges_at,
     query_all_decisions,
     query_decisions_for_file,
-    query_decisions_for_line,
     query_nodes_at,
 )
 
@@ -28,32 +27,54 @@ def _sqlite_path() -> Path:
     return db_path_for_root(Path.cwd())
 
 
+def _matches_scope(path: str, prefix: str) -> bool:
+    """True when a path is the scope itself or lives under it."""
+    if not prefix or prefix == ".":
+        return True
+    candidate = normalize_location_path(path or "")
+    return bool(candidate) and (candidate == prefix or candidate.startswith(prefix + "/"))
+
+
+def _governed_paths(conn) -> dict[str, set[str]]:
+    """Map each decision to the code files it is bound to."""
+    rows = conn.execute(
+        "SELECT DISTINCT decision_uid, file_path FROM decision_code_links"
+    ).fetchall()
+    out: dict[str, set[str]] = {}
+    for decision_uid, file_path in rows:
+        out.setdefault(str(decision_uid), set()).add(str(file_path))
+    return out
+
+
+def _in_scope(decision: Decision, prefix: str, governed: dict[str, set[str]]) -> bool:
+    """A decision is in scope when it was recorded there or governs code there."""
+    if _matches_scope(decision.file_path, prefix):
+        return True
+    return any(_matches_scope(path, prefix) for path in governed.get(decision.uid, ()))
+
+
 def _load_graph_sqlite(at: datetime, scope: str) -> dict[str, Any]:
-    """Load nodes/edges/decisions valid at a timestamp."""
+    """Load nodes/edges/decisions valid at a timestamp, filtered by scope.
+
+    The scope is never widened behind the caller's back: an empty result means
+    "nothing in this scope", and the stats describe exactly what came back.
+    """
     db_path = _sqlite_path()
     if not db_path.exists():
-        return {"nodes": [], "edges": [], "decisions": [], "stats": _empty_stats()}
+        return {"nodes": [], "edges": [], "decisions": [], "stats": _empty_stats(),
+                "scope": normalize_location_path(scope) or "."}
+    prefix = normalize_location_path(scope).rstrip("/")
     conn = connect(db_path)
     try:
-        nodes = query_nodes_at(conn, at, scope)
-        edge_count = count_edges_at(conn, at, scope)
-        edges = list_edges_at(conn, at, scope, limit=400)
-        all_decisions = [
+        nodes = query_nodes_at(conn, at, prefix)
+        edge_count = count_edges_at(conn, at, prefix)
+        edges = list_edges_at(conn, at, prefix, limit=400)
+        governed = _governed_paths(conn)
+        decisions = [
             d
             for d in select_decisions(query_all_decisions(conn))
-            if d.timestamp.date() <= at.date()
+            if d.timestamp.date() <= at.date() and _in_scope(d, prefix, governed)
         ]
-        prefix = normalize_location_path(scope)
-        scoped = []
-        if prefix and prefix != ".":
-            scoped = [
-                d
-                for d in all_decisions
-                if (d.file_path or "").startswith(prefix)
-                or prefix.startswith((d.file_path or "").rsplit("/", 1)[0] or "\0")
-            ]
-        # Keep the graph useful: if scope filter empties decisions, show top global ones.
-        decisions = scoped or all_decisions
         return {
             "nodes": [_node_json(n) for n in nodes],
             "edges": edges,
@@ -63,6 +84,7 @@ def _load_graph_sqlite(at: datetime, scope: str) -> dict[str, Any]:
                 "edges": edge_count,
                 "decisions": len(decisions),
             },
+            "scope": prefix or ".",
         }
     finally:
         conn.close()
@@ -104,6 +126,8 @@ def _decision_json(decision: Decision) -> dict[str, Any]:
         "line": decision.line,
         "constraints": decision.constraints,
         "confidence": decision.confidence,
+        "category": decision.category,
+        "tier": decision.tier.value,
     }
 
 
@@ -144,30 +168,33 @@ def create_app() -> FastAPI:
         file: str = Query(...),
         line: int = Query(...),
     ) -> JSONResponse:
-        """Return node + decisions for a file:line."""
+        """Return node + decisions for a file:line.
+
+        Uses the same resolution as `codegraph why`, so the UI and the CLI
+        cannot disagree about whether a decision exists for a line.
+        """
+        from codegraph.commands.why import load_code_node_sqlite, load_decisions_sqlite
+
         path = normalize_location_path(file)
+        db_path = _sqlite_path()
         node = None
         decisions: list[Decision] = []
-        db_path = _sqlite_path()
+        level = "none"
         if db_path.exists():
-            conn = connect(db_path)
-            try:
-                from codegraph.storage import find_node_at_line
-
-                found = find_node_at_line(conn, path, line)
-                node = _node_json(found) if found else None
-                decisions = query_decisions_for_line(conn, path, line)
-                if not decisions:
-                    decisions = query_decisions_for_file(conn, path)
-                decisions = select_decisions(decisions)
-            finally:
-                conn.close()
+            root = db_path.parent.parent
+            found = load_code_node_sqlite(path, line, root=root)
+            node = _node_json(found) if found else None
+            rows, level = load_decisions_sqlite(
+                path, line, root=root, commit_sha=found.commit_sha if found else ""
+            )
+            decisions = select_decisions(rows)
         return JSONResponse(
             {
                 "file": path,
                 "line": line,
                 "node": node,
                 "decisions": [_decision_json(d) for d in decisions[:10]],
+                "binding": level,
             }
         )
 
@@ -215,16 +242,25 @@ def _parse_date(raw: str) -> datetime:
 
 
 def _timeline_sqlite(scope: str) -> list[str]:
-    """Collect distinct valid_from dates as slider ticks."""
+    """Return the distinct dates that have node versions inside the scope."""
     db_path = _sqlite_path()
     if not db_path.exists():
         return []
+    prefix = normalize_location_path(scope).rstrip("/")
     conn = connect(db_path)
     try:
-        rows = conn.execute(
-            "SELECT DISTINCT substr(valid_from, 1, 10) AS d FROM nodes "
-            "WHERE valid_from IS NOT NULL ORDER BY d"
-        ).fetchall()
+        if not prefix or prefix == ".":
+            rows = conn.execute(
+                "SELECT DISTINCT substr(valid_from, 1, 10) AS d FROM nodes "
+                "WHERE valid_from IS NOT NULL ORDER BY d"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT DISTINCT substr(valid_from, 1, 10) AS d FROM nodes "
+                "WHERE valid_from IS NOT NULL AND (file_path = ? OR file_path LIKE ?) "
+                "ORDER BY d",
+                (prefix, prefix + "/%"),
+            ).fetchall()
         return [r[0] for r in rows if r[0]]
     finally:
         conn.close()

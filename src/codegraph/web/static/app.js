@@ -10,7 +10,6 @@
     edges: [],
     decisions: [],
     ticks: [],
-    backend: "sqlite",
     stats: null,
   };
 
@@ -47,9 +46,24 @@
   function currentDate() {
     const ticks = state.ticks;
     if (!ticks.length) return "";
-    const slider = $("time");
-    const idx = Math.min(ticks.length - 1, Math.max(0, Math.round((slider.value / 100) * (ticks.length - 1))));
+    const raw = Number($("time").value);
+    const idx = Number.isFinite(raw)
+      ? Math.min(ticks.length - 1, Math.max(0, Math.round(raw)))
+      : ticks.length - 1;
     return ticks[idx];
+  }
+
+  async function loadTimeline() {
+    const scope = $("scope").value || ".";
+    const data = await fetchJson("/api/timeline", { scope: scope });
+    const ticks = data.ticks && data.ticks.length ? data.ticks : [""];
+    state.ticks = ticks;
+    const slider = $("time");
+    const max = Math.max(0, ticks.length - 1);
+    slider.min = "0";
+    slider.max = String(max);
+    slider.value = String(max);
+    $("time-label").textContent = currentDate() || "now";
   }
 
   function filteredNodes() {
@@ -221,20 +235,22 @@
     cy.elements().remove();
     cy.add(buildElements());
     cy.layout(LAYOUT_OPTS).run();
+    const stats = state.stats || {};
+    const scope = $("scope").value || ".";
     $("stats").textContent =
-      "nodes " + filteredNodes().length +
+      "scope " + scope +
+      " · nodes " + filteredNodes().length +
       " · edges " + (state.edges ? state.edges.length : 0) +
       " · decisions " + filteredDecisions().length +
-      (state.stats ? " (live " + state.stats.edges + ")" : "");
+      (!state.decisions.length && Number(stats.nodes) > 0
+        ? " (none recorded in this scope)"
+        : "");
   }
 
   async function loadGraph() {
-    const at = currentDate();
-    const scope = $("scope").value || ".";
     const data = await fetchJson("/api/graph", {
-      at: at,
-      scope: scope,
-      backend: state.backend,
+      at: currentDate(),
+      scope: $("scope").value || ".",
     });
     state.nodes = data.nodes || [];
     state.edges = data.edges || [];
@@ -303,15 +319,14 @@
 
   function scheduleScope() {
     clearTimeout(scopeTimer);
-    scopeTimer = setTimeout(loadGraph, 500);
+    scopeTimer = setTimeout(async () => {
+      await loadTimeline();
+      await loadGraph();
+    }, 500);
   }
 
   async function init() {
-    const data = await fetchJson("/api/timeline", { scope: "src" });
-    state.ticks = data.ticks && data.ticks.length ? data.ticks : [""];
-    $("time").max = String(Math.max(0, state.ticks.length - 1));
-    $("time").value = String(state.ticks.length - 1);
-    $("time-label").textContent = currentDate() || "now";
+    await loadTimeline();
     await loadGraph();
 
     $("time").addEventListener("input", () => {

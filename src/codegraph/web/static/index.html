@@ -12,7 +12,7 @@
     <div class="brand">CodeGraph</div>
     <div class="slider-wrap">
       <label for="time">Time</label>
-      <input id="time" type="range" min="0" max="100" value="100" />
+      <input id="time" type="range" min="0" max="0" value="0" />
       <span id="time-label">now</span>
     </div>
     <div class="stats" id="stats">nodes 0 · edges 0 · decisions 0</div>
@@ -29,7 +29,6 @@
         <label><input type="checkbox" class="kind" value="function" checked /> function</label>
         <label><input type="checkbox" class="kind" value="class" checked /> class</label>
         <label><input type="checkbox" class="kind" value="variable" checked /> variable</label>
-        <label><input type="checkbox" class="kind" value="method" checked /> method</label>
       </fieldset>
       <fieldset>
         <legend>Decision status</legend>
@@ -52,7 +51,7 @@
     <span><i class="dot code"></i>CodeNode</span>
     <span><i class="dot decision"></i>Decision</span>
     <span><i class="dot edge"></i>edges</span>
-    <span class="muted">Local graph · sqlite / dgraph</span>
+    <span class="muted">Local graph · SQLite</span>
   </footer>
 
   <script src="/static/app.js"></script>

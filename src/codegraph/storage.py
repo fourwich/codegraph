@@ -357,8 +357,8 @@ def query_nodes_at(conn: sqlite3.Connection, at: datetime, scope: str) -> list[C
     )
     params: list[object] = [at.isoformat(), at.isoformat()]
     if prefix and prefix != ".":
-        sql += "AND file_path LIKE ? "
-        params.append(prefix + "%")
+        sql += "AND (file_path = ? OR file_path LIKE ?) "
+        params.extend([prefix, prefix + "/%"])
     sql += "ORDER BY file_path, line_start"
     return [_row_to_node(row) for row in conn.execute(sql, params).fetchall()]
 
@@ -385,8 +385,8 @@ def count_edges_at(conn: sqlite3.Connection, at: datetime, scope: str = "") -> i
     """
     params: list[object] = [at.isoformat(), at.isoformat(), at.isoformat(), at.isoformat()]
     if prefix and prefix != ".":
-        sql += " AND e.file_path LIKE ? "
-        params.append(prefix + "%")
+        sql += " AND (e.file_path = ? OR e.file_path LIKE ?) "
+        params.extend([prefix, prefix + "/%"])
     row = conn.execute(sql, params).fetchone()
     return int(row[0]) if row else 0
 
@@ -416,9 +416,11 @@ def list_edges_at(
     """
     params: list[object] = [at.isoformat(), at.isoformat(), at.isoformat(), at.isoformat()]
     if prefix and prefix != ".":
-        sql += " AND (e.file_path LIKE ? OR e.from_uid LIKE ? OR e.to_uid LIKE ?) "
-        like = prefix + "%"
-        params.extend([like, like, like])
+        sql += (
+            " AND (e.file_path = ? OR e.file_path LIKE ? "
+            "OR e.from_uid LIKE ? OR e.to_uid LIKE ?) "
+        )
+        params.extend([prefix, prefix + "/%", prefix + "::%", prefix + "::%"])
     sql += " LIMIT ?"
     params.append(limit)
     rows = conn.execute(sql, params).fetchall()
@@ -460,11 +462,23 @@ def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[D
 
 
 def query_decisions_for_dir(conn: sqlite3.Connection, file_path: str, limit: int = 5) -> list[Decision]:
-    """Return decisions under the file's directory prefix (file-level fallback)."""
+    """Return decisions under the file's directory prefix (directory fallback).
+
+    A file at the repository root has the root as its directory, which means
+    records for other root-level files — never records from the whole graph.
+    """
     path = file_path.replace("\\", "/")
-    parent = path.rsplit("/", 1)[0] if "/" in path else ""
-    if not parent:
-        return query_all_decisions(conn)[:limit]
+    if "/" not in path:
+        rows = conn.execute(
+            "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
+            "author, file_path, line, constraints, confidence, category, tier FROM decisions "
+            "WHERE file_path NOT LIKE '%/%' "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [_row_to_decision(row) for row in rows]
+
+    parent = path.rsplit("/", 1)[0]
     rows = conn.execute(
         "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
         "author, file_path, line, constraints, confidence, category, tier FROM decisions "

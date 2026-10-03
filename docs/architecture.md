@@ -71,6 +71,11 @@ dependency records.
   `why` treats "linked to the symbol covering this line" as line level, so a
   governed file answers for every symbol inside it.
 
+`codegraph why` and the web API share this resolution — the UI calls the same
+loader — so they cannot disagree about whether a decision exists for a line. The
+web scope filter likewise matches on a path boundary and includes decisions that
+govern the scoped code, and it never widens a scope to fill the result.
+
 Conflict detection works on the same principle: opposite terms are matched on word
 boundaries, two decisions must be in the same file (or the same folder *and*
 share vocabulary), and the generic pairs (`add`/`remove`, `keep`/`drop`) only
