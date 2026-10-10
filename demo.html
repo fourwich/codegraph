@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeGraph — 60-second demo</title>
+<meta name="description" content="CodeGraph turns code structure, git history and design decisions into one queryable graph.">
+<link rel="stylesheet" href="./vendor/asciinema-player.css">
+<style>
+  :root {
+    --page-bg: #fbfbfd;
+    --ink: #1d1d1f;
+    --muted: #6e6e73;
+    --accent: #0066cc;
+    --window-bg: #121314;
+    --titlebar-bg: #1f1f22;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+      "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 72px 24px 96px;
+  }
+  header { width: 100%; max-width: 820px; text-align: center; margin-bottom: 48px; }
+  h1 {
+    margin: 0 0 12px;
+    font-size: 48px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .tagline { margin: 0; font-size: 21px; letter-spacing: -0.01em; color: var(--muted); }
+
+  .window {
+    width: 100%;
+    max-width: 820px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--window-bg);
+    box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.22),
+                0 18px 36px -18px rgba(0, 0, 0, 0.30);
+  }
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px;
+    background: var(--titlebar-bg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+  .titlebar .name {
+    margin: 0 auto;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: #98989d;
+  }
+  #player { min-height: 320px; }
+
+  footer { width: 100%; max-width: 820px; margin-top: 32px; text-align: center; font-size: 14px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    body { padding: 40px 16px 64px; }
+    h1 { font-size: 34px; }
+    .tagline { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>CodeGraph</h1>
+    <p class="tagline">Not just what changed — why it was allowed to change.</p>
+  </header>
+
+  <div class="window">
+    <div class="titlebar">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="name">codegraph — zsh</span>
+    </div>
+    <div id="player"></div>
+  </div>
+
+  <footer>
+    <a href="https://github.com/fourwich/codegraph">github.com/fourwich/codegraph</a>
+  </footer>
+
+  <script src="./vendor/asciinema-player.min.js"></script>
+  <script>
+    (function () {
+      var host = document.getElementById("player");
+      if (!window.AsciinemaPlayer) {
+        host.innerHTML =
+          '<p style="padding:24px;color:#98989d">Player failed to load. ' +
+          'The recording is also on <a style="color:#0a84ff" href="https://asciinema.org/a/nTiLYoqrEUvNQFEx">asciinema.org</a>.</p>';
+        return;
+      }
+      window.AsciinemaPlayer.create("./demo.cast", host, {
+        cols: 115,
+        rows: 32,
+        fit: "width",
+        autoplay: true,
+        theme: "asciinema",
+        terminalFontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        terminalFontSize: "15px",
+        preload: true,
+        controls: "auto"
+      });
+    })();
+  </script>
+</body>
+</html>

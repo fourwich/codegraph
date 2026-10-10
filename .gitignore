@@ -38,3 +38,5 @@ vscode-extension/out/
 
 # Video edit intermediates
 submission/video_work/
+
+# 已发布的 demo（根目录 demo.html / demo.cast）由 GitHub Pages 提供，需要提交，勿忽略
