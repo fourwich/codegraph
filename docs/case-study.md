@@ -107,8 +107,10 @@ Honest result: Express `lib/` did not produce contradictory accepted decisions u
 - Express commit messages often lack *because / instead of* wording, so 199 of
   204 records are history events rather than decisions. Precision now costs
   recall: the tool says "I don't know" more often, and that is deliberate.
-- 4 of the 5 Express decisions are not bound to a line, so `why` reaches them
-  through the file / directory fallback and labels the binding accordingly.
+- 5 of the 5 Express decisions have no line links at all (every one of its 199
+  `decision_code_links` rows belongs to an event-tier record), so `why` reaches a
+  decision through the commit- or file-level fallback and labels the binding
+  accordingly.
 - ADR and CHANGELOG decisions have no commit of their own. They bind only to code
   they name — a `governs:` declaration, a backticked path, or a distinctive
   backticked identifier. Express has no ADR directory, so nothing there is
@@ -120,6 +122,17 @@ Honest result: Express `lib/` did not produce contradictory accepted decisions u
   arbitrary mid-week dates can return "No commit found".
 - Pure JS examples outside `lib/` inflate node counts with require/import
   identifiers (variable nodes).
+
+### Recall vs precision trade-off
+
+CodeGraph now prioritizes precision: a decision card only appears when a real
+reason is extractable. In practice this means roughly 40% of line queries return
+"no record" instead of a weak commit subject — measured on this repository, 10 of
+25 randomly sampled lines across `src/` answered with nothing, while the 15 that
+did answer were all bound to the file being queried. That is a deliberate
+trade-off: a small number of trustworthy answers beats a large number of noise.
+Projects with ADRs and conventional commits see better coverage than projects
+with free-form commit messages.
 
 ## Reproduce
 

@@ -1,8 +1,6 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
-[![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
-[![Downloads](https://img.shields.io/pypi/dm/codegraphx)](https://pypi.org/project/codegraphx/)
+![tests](https://img.shields.io/badge/tests-136%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -13,7 +11,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 117 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 136 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -26,7 +24,9 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (117 tests passing).
+Verified with `pytest -q` and `codegraph --help` (136 tests passing, 82% coverage).
+
+Numbers in this README and in `docs/` were measured at commit [`a06bcaa`](https://github.com/fourwich/codegraph/commit/a06bcaa). Re-check with `pytest -q`.
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`)
@@ -35,7 +35,7 @@ Verified with `pytest -q` and `codegraph --help` (117 tests passing).
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 117 tests passing
+- [x] 136 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
@@ -54,15 +54,12 @@ Verified with `pytest -q` and `codegraph --help` (117 tests passing).
 
 ## Quick start
 
-```bash
-pip install codegraphx
-codegraph index .
-codegraph why src/main.py:42
-```
-
-Or from source:
+CodeGraph is not on PyPI yet. Install from source:
 
 ```bash
+git clone https://github.com/fourwich/codegraph
+cd codegraph
+
 # recommended: uv
 uv venv
 uv pip install -e ".[dev]"
@@ -71,6 +68,10 @@ uv pip install -e ".[dev]"
 python -m venv .venv
 .venv\Scripts\pip install -e ".[dev]"   # Windows
 # source .venv/bin/activate && pip install -e ".[dev]"  # macOS/Linux
+
+# then, from any repository you want to inspect
+codegraph index .
+codegraph why src/main.py:42
 ```
 
 ## Commands (8)

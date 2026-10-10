@@ -125,7 +125,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 117 tests passing (`pytest -q`) |
+| ✅ Done | 136 tests passing (`pytest -q`, 82% coverage of `src/codegraph`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |

@@ -35,17 +35,17 @@ state a reason — in which case they are dependency **decisions**.
 | Project | Depth | Records | Decisions | Decision share | With reason | With alternative |
 |---|---|---|---|---|---|---|
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 57 | **9** | 15.8% | 8 | 6 |
+| CodeGraph self | 50 | 65 | **11** | 16.9% | 8 | 8 |
 
 The Express row is the stable reference. The self row was measured on this
-repository at commit `1d3538d`, and drifts by roughly one record per commit made
-to this repository — re-run the script to get the current figure.
+repository at commit `a06bcaa`, and drifts with every commit made to this
+repository — re-run the script to get the current figure.
 
 The old headline was "174 decisions on Express". Under the tier model the same
 run yields 204 records of which **5** are decisions: precision went up, and the
 number went down, which is the point.
 
-The self repo's 9 decisions are 5 ADRs plus 4 CHANGELOG entries — sources that
+The self repo's 11 decisions are 6 ADRs plus 5 CHANGELOG entries — sources that
 are handwritten rather than scraped from commit subjects.
 
 ## Recall note
@@ -68,15 +68,25 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-3 of the 9 decisions are bound that way, so `why src/codegraph/storage.py:200`
-returns ADR-001 instead of nothing.
+9 of the 11 decision-tier records have line links: 4 ADRs through their `governs:`
+declaration, and all 5 CHANGELOG entries through the lines they touched. So
+`why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
+unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
+pair that governs no code.
 
 Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 1606 |
-| widest single record | 3233 links / 46 files | 233 links / 5 files |
+| `decision_code_links` rows | 9323 | 1882 |
+| widest single record | 3233 links / 46 files | 240 links / 4 files |
+
+Express tells a different story, and it is worth stating plainly: all 199 of its
+`decision_code_links` rows belong to **event**-tier records. Its 5 decisions have
+**0 line links**, so `why` reaches them through the commit- or file-level fallback
+only — `why lib/response.js:229` reports `binding: file-level decision`. On a
+repository with ADRs, line-level answers are the common case; on a repository
+without them, they are rare.
 
 ## Conflict precision
 
