@@ -5,6 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+from typer.testing import CliRunner
+
+from codegraph.cli import app
+from codegraph.commands import index as index_module
+from codegraph.commands.index import GraphShrinkError, guard_node_collapse
 from codegraph.git.history import GitHistory
 from codegraph.git.incremental import commits_after, load_last_head, save_last_head
 from codegraph.storage import connect, db_path_for_root
@@ -187,4 +193,36 @@ def test_truncated_graph_is_rebuilt(tmp_path: Path) -> None:
 
     _run_index(root)
     assert len(_graph_state(root)["nodes"]) == expected
+
+
+def test_guard_allows_growth_a_full_rebuild_and_a_first_index() -> None:
+    """The shrink guard only fires for an incremental write that loses data."""
+    guard_node_collapse(10, 10, replace=False)
+    guard_node_collapse(20, 10, replace=False)
+    guard_node_collapse(1, 10, replace=True)  # --full may legitimately shrink
+    guard_node_collapse(0, 0, replace=False)  # first index
+
+
+def test_guard_refuses_an_incremental_write_that_drops_half() -> None:
+    """Losing more than half the graph is treated as a lost-history rebuild."""
+    with pytest.raises(GraphShrinkError):
+        guard_node_collapse(4, 10, replace=False)
+
+
+def test_refused_write_leaves_the_graph_untouched(tmp_path: Path, monkeypatch) -> None:
+    """When the guard trips the command must exit 4 and write nothing."""
+    root = _make_repo(tmp_path)
+    _run_index(root)
+    before = _graph_state(root)
+    assert before["nodes"]
+
+    def trip(new_count: int, previous_count: int, *, replace: bool) -> None:
+        raise GraphShrinkError("simulated lost-history rebuild")
+
+    monkeypatch.setattr(index_module, "guard_node_collapse", trip)
+    result = CliRunner().invoke(app, ["index", str(root), "--depth", "20"])
+
+    assert result.exit_code == 4
+    assert "Refusing to write" in result.output
+    assert _graph_state(root) == before
 
