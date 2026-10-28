@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **149 tests passing** · **8 CLI commands** · **7 languages**
+Verified locally: **154 tests passing** · **8 CLI commands** · **7 languages**
 
 ---
 
@@ -44,7 +44,7 @@ I built CodeGraph in stages so each one stayed runnable.
 5. **Web + export** — `codegraph serve` (FastAPI + Cytoscape) and `codegraph export --for-ai` context packs for coding agents.
 6. **Editor + LLM** — VSCode “Show decision” using JSON output; optional Ollama extraction (`--use-llm`) that degrades to rules when offline.
 
-Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **149 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
+Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **154 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
 
 ### Challenges I faced
 
@@ -63,6 +63,59 @@ Coding assistants are brilliant at generating code in front of them, but they ca
 ### What's next
 
 Only unfinished work: richer conflict rules, publishing the VSCode extension to the Marketplace, and performance tuning on larger monorepos. CI now runs ruff, mypy, pytest and a materials check on a 6-job matrix (Ubuntu/Windows/macOS × Python 3.10/3.12) and is green; the next step is publishing to PyPI so `pip install` works without cloning. No vaporware — if it is not in the repo or tests, it is not in this story.
+
+### How this maps to the judging criteria
+
+I did not want to argue for effort in adjectives, so here is where each criterion
+can be checked in the repository.
+
+**Effort and work ethic (40%)**
+
+- **154 tests**, 84% coverage of `src/codegraph`, and a CI matrix of six jobs
+  (Ubuntu/Windows/macOS × Python 3.10/3.12) that is green. The lint step had been
+  failing since September 24 — 26 consecutive red runs in which `mypy` and
+  `pytest` never executed. A third-party review is how I found that, and fixing
+  it took 22 lint findings plus one real typing bug.
+- **Twenty-two review findings**, each fixed in its own commit with the evidence
+  in the message (`git log 887ea73..HEAD`). Two examples: running `index` twice
+  used to shrink an Express graph from 7027 nodes to 1871 and erase all history;
+  a `pip install` line pointed at a package that did not exist.
+- **A deleted feature**: 503 lines of Dgraph client code removed, with
+  [ADR-006](adr/006-drop-dgraph-backend.md) recording why. Deleting something I
+  was proud of was the hardest part of the project.
+- **Numbers cannot drift**: `scripts/check_materials.py` compares every "N tests"
+  claim in the README and docs against `pytest --collect-only` and runs in CI. It
+  has already caught twelve stale claims.
+
+**Feasibility and execution (25%)**
+
+- The pipeline is real, not a mock: tree-sitter parses seven languages, GitPython
+  walks actual history, SQLite stores versioned nodes, and `graph --at` filters by
+  `valid_from` / `valid_to`.
+- Measured on two real repositories, not a fixture: Express 5920 nodes / 1460
+  edges / 204 records in ~60 s; `got` 19142 nodes / 65878 edges / 237 records in
+  75 s. Reproduce with the commands in [benchmarks](benchmarks.md).
+- Interfaces beyond the CLI: a FastAPI + Cytoscape web UI with a timeline slider,
+  and a VSCode extension driven by `why --json`.
+
+**Potential impact (25%)**
+
+- The problem is specific and common: a line looks arbitrary, `git blame` gives a
+  name and a date, and the reason is somewhere else.
+- Precision is measured instead of claimed: on Express, **5 decisions out of 204
+  records** (the honest number, down from an inflated 174); on `got`, **36 of
+  237** without any per-repository tuning. Both reproduce with
+  `scripts/eval_decision_precision.py`.
+- When there is no record, the tool says so — and now falls back to the decisions
+  that govern the file, instead of guessing.
+
+**Communication and clarity (10%)**
+
+- The README opens with five commands that work from a clean clone.
+- [docs/pitch_5min.md](pitch_5min.md) is the recorded walkthrough; the live demo
+  is a self-hosted asciinema player with no CDN dependency.
+- The case study states what did **not** work ([case study → limitations](case-study.md)),
+  including the 40% of line queries that return nothing and why that is deliberate.
 
 ## 3. Built with (tags)
 
@@ -110,4 +163,4 @@ I would define the versioned-node schema on day one, and add `--json` earlier so
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (149 tests, 8 commands, 7 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (154 tests, 8 commands, 7 languages).

@@ -23,6 +23,7 @@
 - The public materials carry only measured numbers, and the CI suite is green again: 22 lint findings and one real typing bug had kept `ruff` failing since 2026-09-24, so `mypy` and `pytest` never ran in CI.
 - Indexing reuses one Git repo handle and caches each commit's parsed diff, because decision binding asked for the same commit once per record: on `got`, 85 records shared 50 commits, and the redundant git calls cost a third of the index time. `got` depth 200: 111s → 75s, identical graph.
 - `codegraph why` on a line with no bound record now reports the decisions that govern the whole file, so a line inside a governed module returns that module's ADR instead of "no record". The JSON payload gains a `related` array for the same case.
+- Date refs use the local calendar, not UTC: a commit's `git log --date=short` date now resolves with `diff` and `graph --at`. Comparing against the UTC date made every date fail for part of the day east of Greenwich (a commit at 00:30 in UTC+8 is still the previous day in UTC), and `graph --at` placed its cut-off eight hours late. Both are covered by timezone tests that do not depend on the machine clock.
 
 ## Removed
 

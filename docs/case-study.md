@@ -140,6 +140,31 @@ An empty answer is not a dead end: when nothing is bound to the queried line,
 `why` reports the decisions bound to the file, so a line inside a governed module
 still returns that module's ADR rather than nothing at all.
 
+## A second project, measured the same way
+
+Express is the hard case: free-form commit subjects, no ADR directory. A single
+project cannot show whether the extractor generalizes, so the same commands were
+run on `sindresorhus/got` (TypeScript, conventional commits with explanatory
+bodies).
+
+| | expressjs/express | sindresorhus/got |
+|---|---|---|
+| Commits indexed | 200 | 200 |
+| Nodes | 5920 | 19142 |
+| Edges | 1460 | 65878 |
+| Records | 204 | 237 |
+| **Decisions** | **5** (2.5%) | **36** (15.2%) |
+| Index wall time | ~60 s | 75 s |
+
+The difference is the input, not the configuration: `got` writes commit bodies
+that explain a change, so 36 of its 237 records state a reason or a rejected
+alternative. Nothing was tuned for either repository.
+
+This is the honest shape of the product: it reads the rationale a project
+already writes down. On a codebase with ADRs and conventional commits it answers
+often; on one without them it usually says "no record" — which is the correct
+answer, and the reason 174 "decisions" on Express was not.
+
 ## Reproduce
 
 ```bash

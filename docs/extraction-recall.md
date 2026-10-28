@@ -36,7 +36,7 @@ state a reason — in which case they are dependency **decisions**.
 |---|---|---|---|---|---|---|
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 69 | **14** | 20.3% | 9 | 10 |
+| CodeGraph self | 50 | 70 | **14** | 20.0% | 9 | 10 |
 
 `got` and `express` bracket the product's actual range, which is why both are
 here rather than only the flattering one. Express writes free-form commit
@@ -87,7 +87,7 @@ Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 2434 |
+| `decision_code_links` rows | 9323 | 2588 |
 | widest single record | 3233 links / 46 files | 240 links / 4 files |
 
 Express tells a different story, and it is worth stating plainly: all 199 of its

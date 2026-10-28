@@ -49,6 +49,12 @@ Commit msgs / ADRs / CHANGELOG ──▶  Decision extractor
 decisions only; `--include-events` adds history, `--include-dependency` adds
 dependency records.
 
+Dates are the user's calendar dates, not UTC: `graph --at 2026-10-29` covers that
+day in the machine's local zone, and a date ref for `diff` matches the date
+`git log --date=short` prints. Comparing against UTC silently failed for part of
+every day east of Greenwich, which is the kind of bug a timezone-independent test
+catches.
+
 ---
 
 ## Binding a decision to code
@@ -135,7 +141,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 149 tests passing (`pytest -q`, 82% coverage of `src/codegraph`) |
+| ✅ Done | 154 tests passing (`pytest -q`, 84% coverage of `src/codegraph`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |

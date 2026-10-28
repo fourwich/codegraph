@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 import typer
@@ -33,9 +33,19 @@ def parse_date(raw: str) -> date:
         raise DateError(f"Date '{raw}' is invalid. Use YYYY-MM-DD, e.g. 2024-11-02") from exc
 
 
+def local_day_end(day: date) -> datetime:
+    """Return the last instant of a local calendar day as an aware UTC datetime.
+
+    Stored `valid_from` / `valid_to` values are UTC ISO strings, so the query
+    boundary has to be UTC too. Treating local midnight as if it were UTC put the
+    cut-off eight hours late east of Greenwich.
+    """
+    return datetime.combine(day, time(23, 59, 59)).astimezone(timezone.utc)
+
+
 def filter_decisions_at(decisions: list[Decision], at: date) -> list[Decision]:
-    """Return decisions created on or before the given date."""
-    return [d for d in decisions if d.timestamp.date() <= at]
+    """Return decisions created on or before the given local date."""
+    return [d for d in decisions if d.timestamp.astimezone().date() <= at]
 
 
 def load_snapshot_sqlite(
@@ -43,7 +53,7 @@ def load_snapshot_sqlite(
 ) -> tuple[int, int, int, list[str], list[Decision]]:
     """Load a historical snapshot from SQLite."""
     db_path = db_path_for_root(root)
-    at_dt = datetime(at.year, at.month, at.day, 23, 59, 59)
+    at_dt = local_day_end(at)
     if not db_path.exists():
         return 0, 0, 0, [], []
 

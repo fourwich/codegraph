@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -141,7 +141,9 @@ def test_graph_at_after_reindex_is_stable(tmp_path: Path) -> None:
 
     root = _make_repo(tmp_path)
     _run_index(root)
-    at = datetime.now(timezone.utc).date()
+    # --at takes a local calendar date, so use the local one: its end-of-day is
+    # what covers a commit made just now.
+    at = datetime.now().date()
     before = load_snapshot_sqlite(root, at, "src")[:3]
 
     _run_index(root)
