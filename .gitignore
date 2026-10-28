@@ -40,3 +40,5 @@ vscode-extension/out/
 submission/video_work/
 
 # 已发布的 demo（根目录 demo.html / demo.cast）由 GitHub Pages 提供，需要提交，勿忽略
+tests.xml
+coverage.xml

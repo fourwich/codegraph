@@ -58,34 +58,77 @@ def _pytest(args: list[str]) -> str:
     return result.stdout
 
 
+def _junit_test_count(path: Path) -> int | None:
+    """Test count from a JUnit report written by the run that just happened."""
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8", errors="replace")
+    count = len(re.findall(r"<testcase\b", text))
+    return count or None
+
+
+def _coverage_from_xml(path: Path) -> int | None:
+    """Coverage percentage from the coverage.xml of the run that just happened."""
+    if not path.is_file():
+        return None
+    match = re.search(r'line-rate="([0-9.]+)"', path.read_text(encoding="utf-8", errors="replace"))
+    if match is None:
+        return None
+    return round(float(match.group(1)) * 100)
+
+
 def collected_test_count() -> int:
-    """Number of tests pytest collects."""
+    """Number of tests that ran (JUnit report when present, else a collect run)."""
+    from_junit = _junit_test_count(ROOT / "tests.xml")
+    if from_junit is not None:
+        return from_junit
     stdout = _pytest(["--collect-only", "-q"])
     match = re.search(r"(\d+)\s+tests?\s+collected", stdout)
     if match is None:
-        print("Could not read the collected test count:", file=sys.stderr)
-        print(stdout[-2000:], file=sys.stderr)
-        raise SystemExit(2)
-    return int(match.group(1))
+        _diagnose("Could not read the collected test count", stdout)
+    return int(match.group(1))  # type: ignore[union-attr]
 
 
 def coverage_percent() -> int:
-    """Total statement coverage of src/codegraph, as pytest reports it."""
+    """Total statement coverage (coverage.xml when present, else a full run)."""
+    from_xml = _coverage_from_xml(ROOT / "coverage.xml")
+    if from_xml is not None:
+        return from_xml
     stdout = _pytest(
         ["-q", "--cov=src/codegraph", "--cov-report=term", "-m", "not dgraph"]
     )
     match = re.search(r"^TOTAL\s+\d+\s+\d+\s+(\d+)%", stdout, re.MULTILINE)
     if match is None:
-        print("Could not read the coverage total:", file=sys.stderr)
-        print(stdout[-2000:], file=sys.stderr)
-        raise SystemExit(2)
-    return int(match.group(1))
+        _diagnose("Could not read the coverage total", stdout)
+    return int(match.group(1))  # type: ignore[union-attr]
+
+
+def _diagnose(message: str, stdout: str) -> None:
+    """Report an unreadable measurement on the run summary, then stop."""
+    detail = f"{message}\n\n```\n{stdout[-1500:]}\n```"
+    print(message, file=sys.stderr)
+    print(stdout[-2000:], file=sys.stderr)
+    _summary(detail)
+    raise SystemExit(2)
+
+
+def _summary(text: str) -> None:
+    """Append to the GitHub Actions run summary when running there."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(text + "\n")
+    except OSError:
+        pass
 
 
 def _annotate(message: str) -> None:
     """Surface a failure as a GitHub Actions annotation (visible without log auth)."""
     if os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::error title=Materials::{message}")
+    _summary(f"- {message}")
 
 
 def main() -> int:
