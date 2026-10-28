@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -81,10 +82,22 @@ def coverage_percent() -> int:
     return int(match.group(1))
 
 
+def _annotate(message: str) -> None:
+    """Surface a failure as a GitHub Actions annotation (visible without log auth)."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::error title=Materials::{message}")
+
+
 def main() -> int:
     """Check (or fix) every measured-number claim."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fix", action="store_true", help="Rewrite stale numbers in place")
+    parser.add_argument(
+        "--coverage-tolerance",
+        type=int,
+        default=1,
+        help="Allowed absolute difference in coverage points (platforms differ slightly)",
+    )
     args = parser.parse_args()
 
     expected = {
@@ -92,6 +105,11 @@ def main() -> int:
         "coverage": coverage_percent(),
     }
     stale: list[tuple[Path, int, str]] = []
+
+    def disagrees(metric: str, value: int) -> bool:
+        if metric == "coverage":
+            return abs(value - expected[metric]) > args.coverage_tolerance
+        return value != expected[metric]
 
     for path in material_files():
         text = path.read_text(encoding="utf-8")
@@ -101,7 +119,7 @@ def main() -> int:
             for metric, patterns in CLAIM_PATTERNS.items():
                 for pattern in patterns:
                     for match in pattern.finditer(line):
-                        if int(match.group(1)) == expected[metric]:
+                        if not disagrees(metric, int(match.group(1))):
                             continue
                         stale.append((path, index + 1, line.strip()))
                         if args.fix:
@@ -114,22 +132,21 @@ def main() -> int:
         if changed:
             path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="")
 
+    measured = f"{expected['tests']} tests, {expected['coverage']}% coverage"
     if not stale:
-        print(
-            f"All materials report {expected['tests']} tests and "
-            f"{expected['coverage']}% coverage."
-        )
+        print(f"All materials agree with pytest ({measured}).")
         return 0
 
     for path, line_number, line in stale:
         print(f"{path.relative_to(ROOT)}:{line_number}: {line[:110]}")
     if args.fix:
-        print(f"\nRewrote {len(stale)} claim(s).")
+        print(f"\nRewrote {len(stale)} claim(s) to {measured}.")
         return 0
-    print(
-        f"\n{len(stale)} claim(s) disagree with pytest "
-        f"({expected['tests']} tests, {expected['coverage']}% coverage). Run with --fix."
-    )
+    summary = f"{len(stale)} claim(s) disagree with pytest ({measured})"
+    print(f"\n{summary}. Run with --fix.")
+    _annotate(summary)
+    for path, line_number, line in stale[:5]:
+        _annotate(f"{path.relative_to(ROOT)}:{line_number}: {line[:100]}")
     return 1
 
 
