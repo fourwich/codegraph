@@ -34,6 +34,10 @@ jobs:
       - name: Pytest
         run: pytest -q --cov=src/codegraph --cov-report=xml -m "not dgraph"
 
+      - name: Materials match the measured test count
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: python scripts/check_materials.py
+
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4

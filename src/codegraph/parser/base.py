@@ -106,7 +106,15 @@ class BaseParser(ABC):
         calls: list[tuple[str, str, int, str]] | None = None,
         scope: list[CodeNode] | None = None,
     ) -> list[Edge]:
-        """Match call sites to known nodes and emit uses edges."""
+        """Match call sites to known nodes and emit uses edges.
+
+        When several nodes share the callee's name, a candidate in the file that
+        makes the call wins. ``helper()`` almost always means the ``helper``
+        defined next to it, not the identically named symbol in another package.
+        Cross-file fan-out is only kept when nothing local matches, so the
+        remaining ambiguity is the documented name-matching limitation rather
+        than a silent false edge.
+        """
         sites = self._calls if calls is None else calls
         by_name: dict[str, list[CodeNode]] = {}
         for node in list(nodes) + list(scope or []):
@@ -121,6 +129,9 @@ class BaseParser(ABC):
             targets = by_name.get(callee_name, [])
             if caller is None or not targets:
                 continue
+            local = [t for t in targets if t.file_path == file_path]
+            if local:
+                targets = local
             for target in targets:
                 key = (caller.uid, target.uid, line)
                 if key in seen:

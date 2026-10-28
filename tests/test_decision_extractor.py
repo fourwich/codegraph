@@ -114,4 +114,5 @@ def test_extract_from_commits_and_changelog(tmp_path: Path) -> None:
         for d in commit_decisions
     )
     assert changelog
-    assert all(d.source_ref.startswith("CHANGELOG") or True for d in changelog)
+    assert all(d.source_ref.startswith("CHANGELOG") for d in changelog)
+    assert {d.file_path for d in changelog} == {"CHANGELOG.md"}

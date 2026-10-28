@@ -19,6 +19,8 @@
 - Rust `impl` blocks and Go methods now hang off the type they belong to: `impl Scale for Meter { fn scale }` attaches to `Meter`, and `func (c *Calculator) Add()` attaches to `Calculator`. Previously `impl_item` and `type_declaration` were dead entries in the kind maps.
 - Call edges resolve against every symbol live at that commit, not just the file being parsed. The git path previously produced **zero** cross-file `uses` edges while the working-tree path produced them, so the same repository gave two different graphs. Express: 1308 → 3951 `uses` edges, 2515 of them cross-file.
 - Git and working-tree parsing now share one edge rule; `ingest_commit` versions all changed files first, then resolves edges.
+- A call to a name defined in several files prefers the definition in the caller's own file, and only fans out across files when nothing local matches. `helper()` next to its definition no longer links to every same-named `helper` in the repository: Express edges 2409 → 1460, and the share of cross-file edges pointing at an ambiguous name fell from 21% to 17% on this repository.
+- The public materials carry only measured numbers, and the CI suite is green again: 22 lint findings and one real typing bug had kept `ruff` failing since 2026-09-24, so `mypy` and `pytest` never ran in CI.
 
 ## Removed
 

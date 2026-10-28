@@ -64,4 +64,4 @@ def test_get_commits_touching_file(sample_repo: Path) -> None:
     touching = history.get_commits_touching("hello.py")
     assert len(touching) >= 2
     assert all(isinstance(c.timestamp, datetime) for c in touching)
-    assert touching[0].timestamp >= touching[-1].timestamp or True
+    assert touching[0].timestamp >= touching[-1].timestamp

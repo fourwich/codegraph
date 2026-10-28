@@ -24,7 +24,7 @@ def test_split_content_reason() -> None:
     assert content != reason
 
 
-def test_why_file_level_fallback(tmp_path: Path) -> None:
+def test_why_file_level_fallback(tmp_path: Path, monkeypatch) -> None:
     """why falls back to file-level decisions when line is unbound."""
     sample = tmp_path / "src" / "codegraph" / "cli.py"
     sample.parent.mkdir(parents=True)
@@ -54,21 +54,19 @@ def test_why_file_level_fallback(tmp_path: Path) -> None:
     finally:
         conn.close()
 
-    result = runner.invoke(
-        app,
-        ["why", "src/codegraph/cli.py:24"],
-        env={"CODEGRAPH_TEST_ROOT": str(tmp_path)},
-    )
-    # cwd is still repo root; ensure fallback path works against default db if present
-    assert result.exit_code in (0, 1)
-    # Prefer asserting via direct loader against tmp db
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["why", "src/codegraph/cli.py:24"])
+
+    assert result.exit_code == 0
+    assert "Use Typer for the CLI" in result.output
+    assert "file-level decision" in result.output
+
     from codegraph.commands.why import load_decisions_sqlite
 
     rows, level = load_decisions_sqlite(
         "src/codegraph/cli.py", 24, root=tmp_path, commit_sha=""
     )
-    assert rows
-    assert level in {"file", "line"}
+    assert level == "file"
     assert rows[0].content == "Use Typer for the CLI"
     assert "Rich" in rows[0].reason
     assert rows[0].content != rows[0].reason
@@ -101,5 +99,5 @@ def test_why_dir_level_fallback(tmp_path: Path) -> None:
         conn.close()
 
     rows, level = load_decisions_sqlite("src/codegraph/missing.py:1", 1, root=tmp_path)
-    assert level in {"dir", "commit", "none"}
-    assert len(rows) <= 5
+    assert level == "dir"
+    assert len(rows) == 5

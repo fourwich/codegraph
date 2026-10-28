@@ -8,16 +8,18 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | depth 300 | 200 commits / 44.1s | 17208 | 43380 | **14** | TypeScript-heavy; decision rules rarely hit |
-| expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 2409 | **5** (of 204 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
+| expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 1460 | **5** (of 204 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
-Express numbers from the 2026 pass: **5920 nodes / 2409 edges / 204 records**, of
+Express numbers from the 2026 pass: **5920 nodes / 1460 edges / 204 records**, of
 which **5 are decisions** and 199 are history events. The earlier
 "7027 nodes / 1180 edges / 174 decisions" was measured before duplicate node
 versions and dangling edges were removed, and before commit subjects stopped
-counting as decisions. The edge count then rose again because call edges had been
-resolving only inside a single file — 1412 Express edges are now cross-file.
+counting as decisions. The edge count then rose to 2409 because call edges had
+been resolving only inside a single file, and fell back to 1460 once a call
+started preferring the callee defined in its own file instead of fanning out to
+every same-named symbol in the repository.
 
 `Decisions` counts only records that state a reason or a rejected alternative.
 Re-measure any repository with:

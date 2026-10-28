@@ -11,7 +11,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 136 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 144 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -24,9 +24,9 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (136 tests passing, 82% coverage).
+Verified with `pytest -q` and `codegraph --help` (144 tests passing, 82% coverage).
 
-Numbers in this README and in `docs/` were measured at commit [`a06bcaa`](https://github.com/fourwich/codegraph/commit/a06bcaa). Re-check with `pytest -q`.
+Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
 - [x] Product site (HTML / CSS / JS)
 - [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`)
@@ -35,7 +35,7 @@ Numbers in this README and in `docs/` were measured at commit [`a06bcaa`](https:
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 136 tests passing
+- [x] 144 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
