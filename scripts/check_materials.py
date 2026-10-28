@@ -21,7 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 # Historical notes keep the numbers that were true when they were written.
 SKIP = {"release_notes_v0.1.0.md"}
 
-PATTERN = re.compile(r"(?<![\w.])(\d+)\s+(?:tests?(?:\s+passing)?|passing tests)", re.IGNORECASE)
+# Two shapes are in use: prose ("144 tests passing") and the shields.io URL
+# ("tests-144%20passing"), which a plain word-boundary pattern misses.
+CLAIM_PATTERNS = (
+    re.compile(r"(?<![\w.])(\d+)\s+(?:tests?(?:\s+passing)?|passing tests)", re.IGNORECASE),
+    re.compile(r"tests-(\d+)%20passing"),
+)
 
 
 def material_files() -> list[Path]:
@@ -63,13 +68,16 @@ def main() -> int:
         lines = text.splitlines()
         changed = False
         for index, line in enumerate(lines):
-            for match in PATTERN.finditer(line):
-                if int(match.group(1)) == expected:
-                    continue
-                stale.append((path, index + 1, line.strip()))
-                if args.fix:
-                    lines[index] = line[: match.start(1)] + str(expected) + line[match.end(1) :]
-                    changed = True
+            for pattern in CLAIM_PATTERNS:
+                for match in pattern.finditer(line):
+                    if int(match.group(1)) == expected:
+                        continue
+                    stale.append((path, index + 1, line.strip()))
+                    if args.fix:
+                        lines[index] = (
+                            line[: match.start(1)] + str(expected) + line[match.end(1) :]
+                        )
+                        changed = True
         if changed:
             path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="")
 

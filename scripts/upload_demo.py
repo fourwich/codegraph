@@ -59,7 +59,10 @@ def build_body(cast_path: Path) -> tuple[bytes, str]:
     body = b"".join(
         [
             f"--{boundary}\r\n".encode(),
-            f'Content-Disposition: form-data; name="file"; filename="{cast_path.name}"\r\n'.encode(),
+            (
+                f'Content-Disposition: form-data; name="file"; '
+                f'filename="{cast_path.name}"\r\n'
+            ).encode(),
             b"Content-Type: application/octet-stream\r\n\r\n",
             data,
             f"\r\n--{boundary}--\r\n".encode(),
@@ -96,7 +99,7 @@ def main() -> None:
 
     url = payload.get("url") or payload.get("file_url", "")
     print(f"\nRecording: {url}")
-    print(f"Claim this installation (keeps uploads past 7 days):")
+    print("Claim this installation (keeps uploads past 7 days):")
     print(f"  https://asciinema.org/connect/{install_id}")
 
 

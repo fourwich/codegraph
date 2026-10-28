@@ -1,6 +1,6 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-136%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-144%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -21,6 +21,20 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture overv
 See [benchmarks](docs/benchmarks.md) for real-project attempts and synthetic performance numbers.
 See [case study on Express.js](docs/case-study.md) for real-world results after JavaScript support.
 See [decision extraction](docs/extraction-recall.md) for how `decision` and `event` records are separated, and how to reproduce the precision numbers.
+
+### Reviewing this in five minutes
+
+```bash
+pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
+pytest -q                   # 144 tests, no network needed
+codegraph index .           # builds the graph for this repository
+codegraph why src/codegraph/storage.py:200    # one decision card, end to end
+codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
+```
+
+Then: [the architecture](docs/architecture.md) ·
+[what was measured and what is still a limitation](docs/extraction-recall.md) ·
+[the 5-minute pitch script](docs/pitch_5min.md).
 
 ## Status
 
