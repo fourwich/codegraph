@@ -67,7 +67,8 @@
     letter-spacing: 0.02em;
     color: #98989d;
   }
-  #player { min-height: 320px; }
+  #player { min-height: 320px; display: grid; place-items: center; }
+  #player .loading { margin: 0; padding: 24px; color: #98989d; font-size: 14px; }
 
   footer { width: 100%; max-width: 820px; margin-top: 32px; text-align: center; font-size: 14px; }
   footer a { color: var(--accent); text-decoration: none; }
@@ -93,11 +94,13 @@
       <span class="dot green"></span>
       <span class="name">codegraph — zsh</span>
     </div>
-    <div id="player"></div>
+    <div id="player"><p class="loading">Loading the recording…</p></div>
   </div>
 
   <footer>
     <a href="https://github.com/fourwich/codegraph">github.com/fourwich/codegraph</a>
+    &nbsp;·&nbsp;
+    <a href="https://asciinema.org/a/nTiLYoqrEUvNQFEx">watch on asciinema.org</a>
   </footer>
 
   <script src="./vendor/asciinema-player.min.js"></script>
@@ -121,6 +124,7 @@
         preload: true,
         controls: "auto"
       });
+      host.querySelector(".loading")?.remove();
     })();
   </script>
 </body>
