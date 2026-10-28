@@ -1,4 +1,4 @@
-﻿"""Tests for decision version diff."""
+"""Tests for decision version diff."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ from codegraph.git.refs import RefError, resolve_ref
 from codegraph.models import Decision, DecisionSource, DecisionStatus
 
 
-def _dec(uid: str, content: str, status: DecisionStatus = DecisionStatus.ACCEPTED, **kw) -> Decision:
+def _dec(
+    uid: str, content: str, status: DecisionStatus = DecisionStatus.ACCEPTED, **kw
+) -> Decision:
     return Decision(
         uid=uid,
         content=content,
@@ -58,7 +60,9 @@ def test_resolve_ref_by_date(tmp_path: Path) -> None:
     f = tmp_path / "x.py"
     f.write_text("print(1)\n", encoding="utf-8")
     repo.index.add(["x.py"])
-    repo.index.commit("feat: one because demo", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com"))
+    repo.index.commit(
+        "feat: one because demo", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com")
+    )
     commit = repo.head.commit
     day = commit.committed_datetime.strftime("%Y-%m-%d")
     sha2, ts2 = resolve_ref(tmp_path, day)
@@ -72,6 +76,7 @@ def test_resolve_ref_unknown() -> None:
 
 def test_diff_command_no_changes() -> None:
     from typer.testing import CliRunner
+
     from codegraph.cli import app
 
     runner = CliRunner()

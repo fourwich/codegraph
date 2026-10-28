@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 from codegraph.decisions.sources import extract_all
+from codegraph.git.diff import get_changed_lines
 from codegraph.git.history import CommitInfo, GitHistory
 from codegraph.models import (
     CodeNode,
@@ -22,7 +23,6 @@ from codegraph.models import (
 )
 from codegraph.parser.base import BaseParser
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
-from codegraph.git.diff import get_changed_lines
 from codegraph.storage import (
     clear_graph,
     connect,

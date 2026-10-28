@@ -11,8 +11,8 @@ from rich.table import Table
 
 from codegraph.decisions.conflicts import detect_all
 from codegraph.models import (
-    Decision,
     Conflict,
+    Decision,
     DecisionStatus,
     normalize_location_path,
     select_decisions,

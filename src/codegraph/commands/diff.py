@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -36,7 +35,9 @@ def compute_changes(
     for uid, dec in new.items():
         if uid not in old:
             out.append(
-                DecisionChange(kind="added", decision=dec, old_status=None, new_status=dec.status.value)
+                DecisionChange(
+                    kind="added", decision=dec, old_status=None, new_status=dec.status.value
+                )
             )
             continue
         prev = old[uid]
@@ -62,7 +63,9 @@ def compute_changes(
     for uid, dec in old.items():
         if uid not in new:
             out.append(
-                DecisionChange(kind="removed", decision=dec, old_status=dec.status.value, new_status=None)
+                DecisionChange(
+                    kind="removed", decision=dec, old_status=dec.status.value, new_status=None
+                )
             )
 
     out.sort(key=lambda c: (KIND_ORDER.get(c.kind, 9), c.decision.content))

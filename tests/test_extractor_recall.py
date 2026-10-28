@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from codegraph.decisions.extractor import (
     decision_from_commit_subject,
     decisions_from_commit_body,
+    extract_decisions_from_text,
     looks_like_decision,
     split_commit_parts,
 )
 from codegraph.models import DecisionSource
-from codegraph.decisions.extractor import extract_decisions_from_text
 
 TS = datetime(2026, 9, 23, tzinfo=timezone.utc)
 

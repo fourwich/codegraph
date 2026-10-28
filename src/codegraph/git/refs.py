@@ -1,4 +1,4 @@
-﻿"""Resolve git refs (tag / sha / date) to commits."""
+"""Resolve git refs (tag / sha / date) to commits."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def resolve_ref(repo_path: Path, ref: str) -> tuple[str, datetime]:
                 if best_dt is None or ts >= best_dt:
                     best = commit.hexsha
                     best_dt = ts
-        if best is None:
+        if best is None or best_dt is None:
             raise RefError(f"No commit found on {value}")
         return best, best_dt
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codegraph.parser.treesitter_js import JavaScriptParser
 from codegraph.parser.registry import get_parser_for_path, is_supported_source
+from codegraph.parser.treesitter_js import JavaScriptParser
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample.js"
 

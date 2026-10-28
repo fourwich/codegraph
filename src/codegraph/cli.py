@@ -6,8 +6,8 @@ import typer
 
 from codegraph import __version__
 from codegraph.commands.conflicts import conflicts_command
-from codegraph.commands.export import export_command
 from codegraph.commands.diff import diff_command
+from codegraph.commands.export import export_command
 from codegraph.commands.graph import graph_command
 from codegraph.commands.index import index_command
 from codegraph.commands.serve import serve_command

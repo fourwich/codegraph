@@ -8,9 +8,9 @@ from codegraph.parser.base import BaseParser
 from codegraph.parser.treesitter_cpp import CppParser
 from codegraph.parser.treesitter_go import GoParser
 from codegraph.parser.treesitter_java import JavaParser
+from codegraph.parser.treesitter_js import JavaScriptParser
 from codegraph.parser.treesitter_py import PythonParser
 from codegraph.parser.treesitter_rust import RustParser
-from codegraph.parser.treesitter_js import JavaScriptParser
 from codegraph.parser.treesitter_ts import TypeScriptParser
 
 TS_SUFFIXES = {".ts", ".tsx"}

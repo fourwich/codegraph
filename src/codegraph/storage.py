@@ -86,7 +86,9 @@ def connect(db_path: Path) -> sqlite3.Connection:
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables and apply lightweight migrations."""
     conn.executescript(SCHEMA_SQL)
-    _migrate_nodes(conn); _migrate_decision_category(conn); _migrate_links(conn)
+    _migrate_nodes(conn)
+    _migrate_decision_category(conn)
+    _migrate_links(conn)
     conn.commit()
 
 
@@ -106,8 +108,12 @@ def _migrate_decision_category(conn: sqlite3.Connection) -> None:
 def _migrate_links(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(decision_code_links)")}
     if cols and "commit_sha" not in cols:
-        conn.execute("ALTER TABLE decision_code_links ADD COLUMN commit_sha TEXT NOT NULL DEFAULT ''")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_dcl_file_line ON decision_code_links(file_path, line)")
+        conn.execute(
+            "ALTER TABLE decision_code_links ADD COLUMN commit_sha TEXT NOT NULL DEFAULT ''"
+        )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dcl_file_line ON decision_code_links(file_path, line)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_dcl_decision ON decision_code_links(decision_uid)")
 
 
@@ -461,7 +467,9 @@ def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[D
     return [_row_to_decision(row) for row in rows]
 
 
-def query_decisions_for_dir(conn: sqlite3.Connection, file_path: str, limit: int = 5) -> list[Decision]:
+def query_decisions_for_dir(
+    conn: sqlite3.Connection, file_path: str, limit: int = 5
+) -> list[Decision]:
     """Return decisions under the file's directory prefix (directory fallback).
 
     A file at the repository root has the root as its directory, which means
@@ -618,7 +626,9 @@ def query_decisions_for_node_lines(
     return [_row_to_decision(row) for row in rows]
 
 
-def query_decisions_at(conn: sqlite3.Connection, at_time: datetime, scope: str = "") -> list[Decision]:
+def query_decisions_at(
+    conn: sqlite3.Connection, at_time: datetime, scope: str = ""
+) -> list[Decision]:
     """Return decisions known at a timestamp, optionally filtered by file prefix.
 
     Uses decision.timestamp <= at_time (decisions are not retracted in MVP).

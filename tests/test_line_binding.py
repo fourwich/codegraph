@@ -1,13 +1,13 @@
-﻿"""Tests for line-level decision binding via git diffs."""
+"""Tests for line-level decision binding via git diffs."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-from codegraph.git.diff import get_changed_lines, _parse_patch_lines
-from codegraph.models import CodeNode, Decision, DecisionSource, DecisionStatus
 from codegraph.commands.index import bind_decisions_to_lines
+from codegraph.git.diff import _parse_patch_lines, get_changed_lines
+from codegraph.models import CodeNode, Decision, DecisionSource, DecisionStatus
 from codegraph.storage import (
     connect,
     db_path_for_root,
@@ -42,10 +42,14 @@ def test_get_changed_lines_on_temp_git(tmp_path: Path) -> None:
     f = tmp_path / "app.py"
     f.write_text("def a():\n    return 1\n", encoding="utf-8")
     repo.index.add(["app.py"])
-    c1 = repo.index.commit("feat: add a because demo", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com"))
+    repo.index.commit(
+        "feat: add a because demo", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com")
+    )
     f.write_text("def a():\n    return 2\n\ndef b():\n    return 3\n", encoding="utf-8")
     repo.index.add(["app.py"])
-    c2 = repo.index.commit("feat: add b since needed", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com"))
+    c2 = repo.index.commit(
+        "feat: add b since needed", author=Actor("a", "a@e.com"), committer=Actor("a", "a@e.com")
+    )
 
     changed = get_changed_lines(tmp_path, c2.hexsha)
     assert "app.py" in changed
