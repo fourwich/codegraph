@@ -88,6 +88,10 @@ callee, only that definition is linked. Cross-file fan-out remains where nothing
 local matches, and that residual ambiguity is measured and documented rather than
 hidden ([extraction-recall](extraction-recall.md)).
 
+When no record is bound to a queried line, `why` does not simply stop: it reports
+the decisions bound to the whole file. A governed ADR therefore answers for the
+module docstring and the imports, not only for the functions it contains.
+
 ---
 
 ## Eight commands
@@ -131,7 +135,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 146 tests passing (`pytest -q`, 82% coverage of `src/codegraph`) |
+| ✅ Done | 149 tests passing (`pytest -q`, 82% coverage of `src/codegraph`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |

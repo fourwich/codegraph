@@ -27,6 +27,7 @@ from codegraph.storage import (
     query_decisions_for_commit,
     query_decisions_for_dir,
     query_decisions_for_file,
+    query_decisions_for_file_links,
     query_decisions_for_line,
     query_decisions_for_line_links,
     query_decisions_for_node_lines,
@@ -298,7 +299,10 @@ def render_decision_card(
 
 
 def render_not_found(
-    file_path: str, line: int | None = None, hidden_records: int = 0
+    file_path: str,
+    line: int | None = None,
+    hidden_records: int = 0,
+    related: list[Decision] | None = None,
 ) -> None:
     """Render the empty-result hint.
 
@@ -307,9 +311,19 @@ def render_not_found(
         line: Queried line, when known.
         hidden_records: Records that exist but were filtered out by the tier
             and category defaults.
+        related: Decisions bound to this file but not to this line. Showing them
+            turns "nothing here" into an answer for files governed by an ADR.
     """
     location = f"{file_path}:{line}" if line is not None else file_path
     console.print("[bold yellow]No decision record found[/]")
+    if related:
+        console.print("[dim]No record is tied to this line, but this file is governed by:[/]")
+        for item in related:
+            text = item.content if len(item.content) <= 74 else item.content[:71] + "..."
+            console.print(f"  [cyan]{text}[/]")
+            console.print(f"[dim]    source: {item.source_ref}[/]")
+        console.print("[dim]  codegraph decisions --timeline   # all decisions[/]")
+        return
     if hidden_records:
         console.print(
             f"[dim]{hidden_records} history record(s) exist for {location} "
@@ -320,6 +334,26 @@ def render_not_found(
     console.print(f"[dim]No Decision bound to {location}. Try:[/]")
     console.print("[dim]  codegraph index <repo> --depth 50   # build the graph first[/]")
     console.print("[dim]  codegraph decisions --file <path> --timeline[/]")
+
+
+def _file_governed_decisions(
+    file_path: str, include_events: bool, include_dependency: bool
+) -> list[Decision]:
+    """Decisions bound to this file by a link, for an otherwise empty result."""
+    db_path = db_path_for_root(Path.cwd())
+    if not db_path.exists():
+        return []
+    try:
+        conn = connect(db_path)
+        try:
+            rows = query_decisions_for_file_links(conn, file_path)
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001
+        return []
+    return select_decisions(
+        rows, include_events=include_events, include_dependency=include_dependency
+    )[:2]
 
 
 def why_command(
@@ -367,6 +401,9 @@ def why_command(
         include_dependency=include_dependency,
     )
     hidden_records = max(len(raw_decisions) - len(decisions), 0)
+    governed = [] if decisions else _file_governed_decisions(
+        file_path, include_events, include_dependency
+    )
 
     if as_json:
         payload = {
@@ -375,6 +412,7 @@ def why_command(
             "node": _node_payload(node),
             "decisions": [_decision_payload(d) for d in decisions[:10]],
             "binding": level,
+            "related": [_decision_payload(d) for d in governed],
         }
         typer.echo(jsonlib.dumps(payload, ensure_ascii=False, indent=2))
         if not decisions:
@@ -416,7 +454,7 @@ def why_command(
         )
 
     if not decisions:
-        render_not_found(file_path, line, hidden_records=hidden_records)
+        render_not_found(file_path, line, hidden_records=hidden_records, related=governed)
         raise typer.Exit(code=1)
 
     render_decision_card(file_path, line, decisions, level=level)

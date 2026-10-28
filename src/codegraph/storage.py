@@ -512,6 +512,27 @@ def query_decisions_for_commit(conn: sqlite3.Connection, commit_sha: str) -> lis
     return [_row_to_decision(row) for row in rows]
 
 
+def query_decisions_for_file_links(
+    conn: sqlite3.Connection, file_path: str, limit: int = 20
+) -> list[Decision]:
+    """Return decisions bound to any line of this file via decision_code_links.
+
+    A governed ADR answers for the whole file it declares, including lines that no
+    CodeNode covers (module docstrings, imports, blank lines between symbols).
+    """
+    rows = conn.execute(
+        "SELECT DISTINCT d.uid, d.content, d.reason, d.alternatives, d.status, d.source, "
+        "d.source_ref, d.timestamp, d.author, d.file_path, d.line, d.constraints, "
+        "d.confidence, d.category, d.tier "
+        "FROM decisions d "
+        "JOIN decision_code_links l ON l.decision_uid = d.uid "
+        "WHERE l.file_path = ? "
+        "ORDER BY d.timestamp DESC LIMIT ?",
+        (file_path, limit),
+    ).fetchall()
+    return [_row_to_decision(row) for row in rows]
+
+
 def query_all_decisions(conn: sqlite3.Connection) -> list[Decision]:
     """Return all stored decisions."""
     rows = conn.execute(

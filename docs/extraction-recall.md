@@ -36,7 +36,7 @@ state a reason — in which case they are dependency **decisions**.
 |---|---|---|---|---|---|---|
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 67 | **13** | 19.4% | 9 | 9 |
+| CodeGraph self | 50 | 69 | **14** | 20.3% | 9 | 10 |
 
 `got` and `express` bracket the product's actual range, which is why both are
 here rather than only the flattering one. Express writes free-form commit
@@ -53,7 +53,7 @@ The old headline was "174 decisions on Express". Under the tier model the same
 run yields 204 records of which **5** are decisions: precision went up, and the
 number went down, which is the point.
 
-The self repo's 13 decisions are 6 ADRs, 6 CHANGELOG entries and 1 commit body —
+The self repo's 14 decisions are 6 ADRs, 7 CHANGELOG entries and 1 commit body —
 sources that are handwritten rather than scraped from commit subjects, which is
 also why they are all reachable from `why`.
 
@@ -77,7 +77,7 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-11 of the 13 decision-tier records have line links: 4 ADRs through their
+12 of the 14 decision-tier records have line links: 4 ADRs through their
 `governs:` declaration, and the CHANGELOG entries through the lines they touched.
 So `why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
 unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
@@ -87,7 +87,7 @@ Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 2313 |
+| `decision_code_links` rows | 9323 | 2434 |
 | widest single record | 3233 links / 46 files | 240 links / 4 files |
 
 Express tells a different story, and it is worth stating plainly: all 199 of its

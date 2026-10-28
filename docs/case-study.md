@@ -136,6 +136,10 @@ trade-off: a small number of trustworthy answers beats a large number of noise.
 Projects with ADRs and conventional commits see better coverage than projects
 with free-form commit messages.
 
+An empty answer is not a dead end: when nothing is bound to the queried line,
+`why` reports the decisions bound to the file, so a line inside a governed module
+still returns that module's ADR rather than nothing at all.
+
 ## Reproduce
 
 ```bash
