@@ -21,6 +21,7 @@
 - Git and working-tree parsing now share one edge rule; `ingest_commit` versions all changed files first, then resolves edges.
 - A call to a name defined in several files prefers the definition in the caller's own file, and only fans out across files when nothing local matches. `helper()` next to its definition no longer links to every same-named `helper` in the repository: Express edges 2409 → 1460, and the share of cross-file edges pointing at an ambiguous name fell from 21% to 17% on this repository.
 - The public materials carry only measured numbers, and the CI suite is green again: 22 lint findings and one real typing bug had kept `ruff` failing since 2026-09-24, so `mypy` and `pytest` never ran in CI.
+- Indexing reuses one Git repo handle and caches each commit's parsed diff, because decision binding asked for the same commit once per record: on `got`, 85 records shared 50 commits, and the redundant git calls cost a third of the index time. `got` depth 200: 111s → 75s, identical graph.
 
 ## Removed
 

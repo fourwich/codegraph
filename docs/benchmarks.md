@@ -7,10 +7,18 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
-| sindresorhus/got | depth 300 | 200 commits / 44.1s | 17208 | 43380 | **14** | TypeScript-heavy; decision rules rarely hit |
+| sindresorhus/got | depth 300 | 200 commits / 74.9s | 19142 | 65878 | **36** (of 237 records) | TypeScript; conventional commits with rationale carry real decisions |
 | expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 1460 | **5** (of 204 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
+
+Node and edge counts depend on **both** `--depth` and how many commits the
+repository has: the window slides as commits are added, and dropping one early
+bulk commit can remove hundreds of node versions. Compare two runs only when
+both numbers match. The `got` row was re-measured after the 2026 pass; the
+previously published "17208 nodes / 43380 edges / 14 decisions" came from before
+the decision tier model and before call edges resolved across files, which is why
+the decision count is now 36 rather than 14.
 
 Express numbers from the 2026 pass: **5920 nodes / 1460 edges / 204 records**, of
 which **5 are decisions** and 199 are history events. The earlier

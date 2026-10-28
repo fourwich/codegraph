@@ -1,4 +1,4 @@
-﻿"""Parse unified diffs to find changed line numbers per commit."""
+"""Parse unified diffs to find changed line numbers per commit."""
 
 from __future__ import annotations
 
@@ -9,6 +9,13 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+# A repository is opened once per root, and one commit's diff is parsed once.
+# Indexing a repository asks for the same commit repeatedly (a commit produces
+# several decision records), and re-opening GitPython's Repo for every call was
+# measurable: 85 records shared 50 commits on the `got` benchmark.
+_REPOS: dict[str, object] = {}
+_PATCH_CACHE: dict[tuple[str, str], dict[str, list[int]]] = {}
 
 
 def _parse_patch_lines(patch: str) -> list[int]:
@@ -43,19 +50,29 @@ def get_changed_lines(repo_path: Path, commit_sha: str) -> dict[str, list[int]]:
     """Return {file_path: [changed line numbers]} for one commit.
 
     Uses GitPython to read the unified diff of commit vs its first parent
-    (or the full tree for a root commit).
+    (or the full tree for a root commit). Results are cached per repository and
+    commit for the lifetime of the process: the indexer asks about the same
+    commit once per decision record it produced.
     """
+    root = repo_path.expanduser().resolve()
+    key = (str(root), commit_sha)
+    cached = _PATCH_CACHE.get(key)
+    if cached is not None:
+        return cached
+
     from git import InvalidGitRepositoryError, Repo
 
-    root = repo_path.expanduser().resolve()
-    try:
-        repo = Repo(str(root), search_parent_directories=True)
-    except InvalidGitRepositoryError:
-        logger.warning("Not a git repo: %s", root)
-        return {}
+    repo = _REPOS.get(str(root))
+    if repo is None:
+        try:
+            repo = Repo(str(root), search_parent_directories=True)
+        except InvalidGitRepositoryError:
+            logger.warning("Not a git repo: %s", root)
+            return {}
+        _REPOS[str(root)] = repo
 
     try:
-        commit = repo.commit(commit_sha)
+        commit = repo.commit(commit_sha)  # type: ignore[attr-defined]
     except Exception as exc:  # noqa: BLE001
         logger.warning("Cannot read commit %s: %s", commit_sha, exc)
         return {}
@@ -89,6 +106,7 @@ def get_changed_lines(repo_path: Path, commit_sha: str) -> dict[str, list[int]]:
         touched = sorted(set(_parse_patch_lines(patch)))
         if touched:
             out[rel] = touched
+    _PATCH_CACHE[key] = out
     return out
 
 
