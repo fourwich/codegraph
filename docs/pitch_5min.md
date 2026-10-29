@@ -128,7 +128,7 @@ one slide.
 
 **On screen:** README status block and the live site.
 
-> Today: 154 tests, 84% coverage, 8 commands, 7 languages, and a green CI matrix.
+> Today: 154 tests, over 80% coverage, 8 commands, 7 languages, and a green CI matrix.
 > Every number in the README is measured by a script, not typed by hand.
 >
 > What's next is publishing to PyPI so `pip install` works without cloning, and

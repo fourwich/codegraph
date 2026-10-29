@@ -71,7 +71,7 @@ can be checked in the repository.
 
 **Effort and work ethic (40%)**
 
-- **154 tests**, 84% coverage of `src/codegraph`, and a CI matrix of six jobs
+- **154 tests**, over 80% coverage of `src/codegraph`, and a CI matrix of six jobs
   (Ubuntu/Windows/macOS × Python 3.10/3.12) that is green. The lint step had been
   failing since September 24 — 26 consecutive red runs in which `mypy` and
   `pytest` never executed. A third-party review is how I found that, and fixing

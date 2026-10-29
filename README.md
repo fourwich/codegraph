@@ -38,7 +38,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (154 tests passing, 84% coverage).
+Verified with `pytest -q` and `codegraph --help` (154 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 

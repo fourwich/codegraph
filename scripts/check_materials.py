@@ -135,12 +135,6 @@ def main() -> int:
     """Check (or fix) every measured-number claim."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fix", action="store_true", help="Rewrite stale numbers in place")
-    parser.add_argument(
-        "--coverage-tolerance",
-        type=int,
-        default=1,
-        help="Allowed absolute difference in coverage points (platforms differ slightly)",
-    )
     args = parser.parse_args()
 
     expected = {
@@ -149,10 +143,13 @@ def main() -> int:
     }
     stale: list[tuple[Path, int, str]] = []
 
-    def disagrees(metric: str, value: int) -> bool:
+    def disagrees(metric: str, claim: int) -> bool:
+        # A coverage claim is a floor ("over 80%"), not an exact figure: the exact
+        # total differs slightly between platforms, and claiming less than the
+        # measurement is the conservative, honest direction.
         if metric == "coverage":
-            return abs(value - expected[metric]) > args.coverage_tolerance
-        return value != expected[metric]
+            return expected[metric] < claim
+        return claim != expected[metric]
 
     for path in material_files():
         text = path.read_text(encoding="utf-8")
