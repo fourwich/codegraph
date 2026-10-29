@@ -58,9 +58,23 @@ def _pytest(args: list[str]) -> str:
     return result.stdout
 
 
+def _fresh(path: Path) -> bool:
+    """True when the artifact is newer than every source file it should describe.
+
+    CI writes these files minutes before the check runs. Locally they can be
+    left over from an earlier run, and reading a stale `tests.xml` would validate
+    a number that no longer exists.
+    """
+    if not path.is_file():
+        return False
+    sources = list((ROOT / "tests").rglob("*.py")) + list((ROOT / "src").rglob("*.py"))
+    newest_source = max((p.stat().st_mtime for p in sources), default=0)
+    return path.stat().st_mtime >= newest_source
+
+
 def _junit_test_count(path: Path) -> int | None:
     """Test count from a JUnit report written by the run that just happened."""
-    if not path.is_file():
+    if not _fresh(path):
         return None
     text = path.read_text(encoding="utf-8", errors="replace")
     count = len(re.findall(r"<testcase\b", text))
@@ -69,9 +83,11 @@ def _junit_test_count(path: Path) -> int | None:
 
 def _coverage_from_xml(path: Path) -> int | None:
     """Coverage percentage from the coverage.xml of the run that just happened."""
-    if not path.is_file():
+    if not _fresh(path):
         return None
-    match = re.search(r'line-rate="([0-9.]+)"', path.read_text(encoding="utf-8", errors="replace"))
+    match = re.search(
+        r'line-rate="([0-9.]+)"', path.read_text(encoding="utf-8", errors="replace")
+    )
     if match is None:
         return None
     return round(float(match.group(1)) * 100)

@@ -8,6 +8,7 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | depth 300 | 200 commits / 74.9s | 19142 | 65878 | **36** (of 237 records) | TypeScript; conventional commits with rationale carry real decisions |
+| pallets/flask | depth 300 | 200 commits / 36.5s | 7546 | 19840 | **56** (of 231 records) | Python; its `CHANGES.rst` only became readable after rst changelog support |
 | expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 1460 | **5** (of 204 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |

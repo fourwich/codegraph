@@ -116,6 +116,13 @@ one slide.
 > hundred lines and no command ever used it. It's gone, and ADR-006 explains why —
 > a decision record about removing code.
 
+**On screen:** the before/after decision counts for Flask.
+
+> Testing on a third project found something two projects never would have: on
+> Flask, a Python project, the tool found exactly one decision. Python projects
+> ship `CHANGES.rst`, and my parser only knew `CHANGELOG.md`. Teaching it
+> reStructuredText took the same checkout from one decision to fifty-six.
+
 **On screen:** the precision numbers from `docs/extraction-recall.md`.
 
 > The same honesty applies to the product: on Express.js, 204 records reduce to
@@ -128,7 +135,7 @@ one slide.
 
 **On screen:** README status block and the live site.
 
-> Today: 154 tests, over 80% coverage, 8 commands, 7 languages, and a green CI matrix.
+> Today: 161 tests, over 80% coverage, 8 commands, 7 languages, and a green CI matrix.
 > Every number in the README is measured by a script, not typed by hand.
 >
 > What's next is publishing to PyPI so `pip install` works without cloning, and
@@ -144,5 +151,5 @@ one slide.
 > here?" with a decision card: the reason, the rejected alternative, and the commit
 > that introduced it. It parses seven languages, versions the graph from real Git
 > history so you can query any past date, and stays silent when no decision was
-> ever recorded. 154 tests, an honest precision number on Express.js, and a green
+> ever recorded. 161 tests, an honest precision number on Express.js, and a green
 > CI matrix. Decisions as data, not lost chat history.

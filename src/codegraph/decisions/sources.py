@@ -25,6 +25,101 @@ CHANGELOG_SECTION = re.compile(
 )
 CHANGELOG_NEXT = re.compile(r"^##\s+", re.MULTILINE)
 
+# Python projects usually ship CHANGES.rst with reStructuredText headings, and
+# reading only CHANGELOG.md made the tool blind to them: Flask's 537 release-note
+# bullets produced one decision instead of the 26 that state a rationale.
+CHANGELOG_NAMES = (
+    "CHANGELOG.md",
+    "CHANGELOG.rst",
+    "CHANGELOG.txt",
+    "CHANGES.md",
+    "CHANGES.rst",
+    "CHANGES.txt",
+    "HISTORY.md",
+    "HISTORY.rst",
+    "NEWS.md",
+    "NEWS.rst",
+)
+_BULLET = re.compile(r"^(?P<marker>[-*+])\s+(?P<text>\S.*)$")
+_RST_UNDERLINE = re.compile(r"^(?P<title>\S.*)\n[-=~^\"'`#*+]{3,}\s*$", re.MULTILINE)
+_MD_HEADING = re.compile(r"^(?P<hashes>#{1,4})\s+(?P<title>.+?)\s*#*$", re.MULTILINE)
+
+
+def _changelog_path(repo_path: Path) -> Path | None:
+    """Return the first conventional changelog file that exists."""
+    for name in CHANGELOG_NAMES:
+        candidate = repo_path / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _sections(text: str) -> list[tuple[str, str]]:
+    """Split a changelog into (heading, body) pairs for markdown or rst."""
+    headings = [(m.start(), m.group("title")) for m in _RST_UNDERLINE.finditer(text)]
+    headings += [(m.start(), m.group("title")) for m in _MD_HEADING.finditer(text)]
+    if not headings:
+        return [("Changelog", text)]
+    headings.sort(key=lambda item: item[0])
+    out: list[tuple[str, str]] = []
+    for index, (start, title) in enumerate(headings):
+        end = headings[index + 1][0] if index + 1 < len(headings) else len(text)
+        out.append((title.strip()[:60], text[start:end]))
+    return out
+
+
+def _bullets(body: str) -> list[str]:
+    """Return bullet texts, joining indented continuation lines."""
+    bullets: list[str] = []
+    current: list[str] = []
+    for raw in body.splitlines():
+        match = _BULLET.match(raw.strip())
+        if match:
+            if current:
+                bullets.append(" ".join(current))
+            current = [match.group("text").strip()]
+        elif current and raw.startswith((" ", "\t")) and raw.strip():
+            current.append(raw.strip())
+        elif current and not raw.strip():
+            bullets.append(" ".join(current))
+            current = []
+    if current:
+        bullets.append(" ".join(current))
+    return [b for b in bullets if len(b) > 8]
+
+
+def extract_from_changelog(repo_path: Path) -> list[Decision]:
+    """Extract decision-like bullets from a changelog, markdown or rst.
+
+    Every bullet is a candidate and the tier classifier keeps only the ones that
+    state a reason or a rejected alternative, so listing all of them raises recall
+    without lowering precision.
+    """
+    path = _changelog_path(repo_path)
+    if path is None:
+        return []
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        logger.warning("Cannot read %s: %s", path.name, exc)
+        return []
+
+    out: list[Decision] = []
+    for heading, body in _sections(text):
+        for bullet in _bullets(body):
+            out.extend(
+                extract_decisions_from_text(
+                    f"{heading}: {bullet}",
+                    source=DecisionSource.COMMENT,
+                    source_ref=f"{path.name} · {heading}",
+                    timestamp=_file_time(path),
+                    file_path=path.name,
+                    confidence=0.6,
+                )
+            )
+    return out
+
 
 def extract_from_commits(
     repo_path: Path,
@@ -144,38 +239,6 @@ def extract_from_adrs(repo_path: Path) -> list[Decision]:
     return out
 
 
-def extract_from_changelog(repo_path: Path) -> list[Decision]:
-    """Extract decision-like bullets from CHANGELOG Changed/Removed sections."""
-    path = repo_path / "CHANGELOG.md"
-    if not path.is_file():
-        return []
-
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        logger.warning("Cannot read CHANGELOG: %s", exc)
-        return []
-
-    out: list[Decision] = []
-    matches = list(CHANGELOG_SECTION.finditer(text))
-    for i, match in enumerate(matches):
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        nxt = CHANGELOG_NEXT.search(text, start)
-        if nxt and nxt.start() < end:
-            end = nxt.start()
-        body = text[start:end]
-        section = match.group(1)
-        found = extract_decisions_from_text(
-            f"{section}: {body}",
-            source=DecisionSource.COMMENT,
-            source_ref=f"CHANGELOG · {section}",
-            timestamp=_file_time(path),
-            file_path="CHANGELOG.md",
-            confidence=0.6,
-        )
-        out.extend(found)
-    return out
 
 
 def _dedupe_key(decision: Decision) -> tuple[str, str]:

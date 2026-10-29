@@ -35,15 +35,21 @@ state a reason — in which case they are dependency **decisions**.
 | Project | Depth | Records | Decisions | Decision share | With reason | With alternative |
 |---|---|---|---|---|---|---|
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
+| pallets/flask | 200 | 231 | **56** | 24.2% | 20 | 37 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 70 | **14** | 20.0% | 9 | 10 |
+| CodeGraph self | 50 | 72 | **15** | 20.8% | 9 | 11 |
 
-`got` and `express` bracket the product's actual range, which is why both are
-here rather than only the flattering one. Express writes free-form commit
+The three projects bracket the product's actual range, which is why all of them
+are here rather than only the flattering one. Express writes free-form commit
 subjects, so only 5 of 204 records carry a rationale. `got` writes conventional
-commits whose bodies explain the change, so 36 of 237 records (15.2%) are real
-decisions without any extra configuration — the extractor is not tuned per
-repository.
+commits whose bodies explain the change: 36 of 237. Flask documents every release
+in `CHANGES.rst`, a reStructuredText file, so 56 of 231 records state a reason or
+a rejected alternative. None of the three is configured for — the extractor reads
+what the project already writes down.
+
+The flask row is also a bug report: before `CHANGES.rst` support existed, the
+same checkout produced **one** decision, because the extractor looked only at
+`CHANGELOG.md` under a `## Changed` heading. Real Python projects ship neither.
 
 The Express row is the stable reference. The self row was measured on this
 repository at its current HEAD and drifts with every commit made here — the
@@ -53,9 +59,9 @@ The old headline was "174 decisions on Express". Under the tier model the same
 run yields 204 records of which **5** are decisions: precision went up, and the
 number went down, which is the point.
 
-The self repo's 14 decisions are 6 ADRs, 7 CHANGELOG entries and 1 commit body —
+The self repo's 15 decisions are 6 ADRs, 7 CHANGELOG entries and 2 commit bodies —
 sources that are handwritten rather than scraped from commit subjects, which is
-also why they are all reachable from `why`.
+also why most of them are reachable from `why`.
 
 ## Recall note
 
@@ -77,7 +83,7 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-12 of the 14 decision-tier records have line links: 4 ADRs through their
+13 of the 15 decision-tier records have line links: 4 ADRs through their
 `governs:` declaration, and the CHANGELOG entries through the lines they touched.
 So `why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
 unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
@@ -87,8 +93,15 @@ Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 2588 |
+| `decision_code_links` rows | 9323 | 2661 |
 | widest single record | 3233 links / 46 files | 240 links / 4 files |
+
+Binding is the weakest part of a changelog-only corpus: Flask has 56 decisions and
+only **6** of them carry a line link, because a release note says "use `flit_core`
+instead of `setuptools`" without naming a file. They are still queryable — from
+`CHANGES.rst` itself — but `why` on a code line in Flask mostly answers "no
+record". That is the honest limit of reading rationale from prose that does not
+point at code.
 
 Express tells a different story, and it is worth stating plainly: all 199 of its
 `decision_code_links` rows belong to **event**-tier records. Its 5 decisions have
