@@ -1,6 +1,6 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-201%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-207%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -11,12 +11,35 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 201 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 207 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
 - GitHub: https://github.com/fourwich/codegraph
 - Live demo: https://fourwich.github.io/codegraph
+
+### What it looks like
+
+`codegraph why` on a line of this repository — the card is the ADR that decided
+the line, reached from the line itself:
+
+![codegraph why showing a decision card](docs/assets/why.svg)
+
+`codegraph index` builds the graph; the counts below are real output from this
+repository:
+
+![codegraph index output](docs/assets/index.svg)
+
+`codegraph decisions --timeline` lists decisions oldest first, and
+`codegraph conflicts` reports contradictions it can justify:
+
+<p>
+  <img src="docs/assets/decisions.svg" alt="decision timeline" width="46%" />
+  <img src="docs/assets/conflicts.svg" alt="conflict report" width="52%" />
+</p>
+
+These are not mockups: `scripts/render_terminal_svg.py` renders text captured
+from an actual run, so a screenshot cannot drift from the tool.
 
 See [benchmarks](docs/benchmarks.md) for real-project attempts and synthetic performance numbers.
 See [case study on Express.js](docs/case-study.md) for real-world results after JavaScript support.
@@ -26,7 +49,7 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ```bash
 pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
-pytest -q                   # 201 tests, no network needed
+pytest -q                   # 207 tests, no network needed
 codegraph index .           # builds the graph for this repository
 codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
@@ -39,7 +62,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (201 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (207 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -50,7 +73,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 201 tests passing
+- [x] 207 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)

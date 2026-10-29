@@ -1,0 +1,5 @@
+# Generated artifacts that CI compares byte-for-byte must not be line-ending
+# converted at checkout: `git diff --exit-code docs/assets/` would fail on every
+# Windows or autocrlf machine even though nothing changed.
+docs/assets/captures/*.txt text eol=lf
+docs/assets/*.svg text eol=lf

@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **201 tests passing** · **8 CLI commands** · **7 languages**
+Verified locally: **207 tests passing** · **8 CLI commands** · **7 languages**
 
 ---
 
@@ -44,7 +44,7 @@ I built CodeGraph in stages so each one stayed runnable.
 5. **Web + export** — `codegraph serve` (FastAPI + Cytoscape) and `codegraph export --for-ai` context packs for coding agents.
 6. **Editor + LLM** — VSCode “Show decision” using JSON output; optional Ollama extraction (`--use-llm`) that degrades to rules when offline.
 
-Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **201 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
+Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **207 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
 
 ### Challenges I faced
 
@@ -71,7 +71,7 @@ can be checked in the repository.
 
 **Effort and work ethic (40%)**
 
-- **201 tests**, over 80% coverage of `src/codegraph`, and a CI matrix of six jobs
+- **207 tests**, over 80% coverage of `src/codegraph`, and a CI matrix of six jobs
   (Ubuntu/Windows/macOS × Python 3.10/3.12) that is green. The lint step had been
   failing since September 24 — 26 consecutive red runs in which `mypy` and
   `pytest` never executed. A third-party review is how I found that, and fixing
@@ -166,4 +166,4 @@ I would define the versioned-node schema on day one, and add `--json` earlier so
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (201 tests, 8 commands, 7 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (207 tests, 8 commands, 7 languages).

@@ -1,0 +1,9 @@
+                         Decision conflicts · --scope .
+┌──────────┬────────────────────────────┬───────────────────────────┬──────────┐
+│ Type     │ Decision A                 │ Decision B                │ Location │
+├──────────┼────────────────────────────┼───────────────────────────┼──────────┤
+│ OPPOSITE │ We use stateful            │ We prefer stateless JWT   │ docs/adr │
+│          │ server-side sessions wi…   │ tokens and avoi…          │          │
+└──────────┴────────────────────────────┴───────────────────────────┴──────────┘
+
+Summary: 1 total · 1 opposite · 0 supersede · 0 temporal

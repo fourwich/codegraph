@@ -1,0 +1,40 @@
+┌────────────────────────────── Matched CodeNode ──────────────────────────────┐
+│    kind: function    name: insert_nodes                                      │
+│    range: src/codegraph/storage.py:199-223                                   │
+│    language: python                                                          │
+│    valid: 2026-10-28 → current                                               │
+│    commit: 329d59c29957eb1a28d526f05b937c7aaecc70a4                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+Query src/codegraph/storage.py:200 → 1 matched line-level decision(s)
+
+┌─────────── Decision #1: Use SQLite (stdlib `sqlite3`) as the sto… ───────────┐
+│                                                                              │
+│  [Location]                                                                  │
+│    src/codegraph/storage.py:200                                              │
+│  [Decision]                                                                  │
+│    Use SQLite (stdlib `sqlite3`) as the store under `.codegraph/graph.db`.   │
+│  [Reason]                                                                    │
+│    CodeGraph needs a local store for CodeNodes and Edges during the MVP.     │
+│  Judges and developers must run the CLI without operating a database         │
+│  server. Multi-hop graph queries matter later, but day-one reliability and   │
+│  zero setup matter more.                                                     │
+│  [Alternatives]                                                              │
+│    · Dgraph first (rejected for MVP: requires Docker and ops setup).         │
+│    · In-memory only (rejected: cannot time-travel after the process exits).  │
+│  [Source]                                                                    │
+│    adr · ADR 001-use-sqlite-default                                          │
+│    author: unknown · date: 2026-10-03                                        │
+│  [Status]                                                                    │
+│    ✅ active                                                                 │
+│  [Constraints]                                                               │
+│    · Install and demos work offline with no Docker.                          │
+│    · Schema migrations must be lightweight (`ALTER TABLE` when columns are   │
+│  added).                                                                     │
+│    · A different store would be a rewrite of `storage.py`, not a CLI flag —  │
+│  see                                                                         │
+│    · ADR-006 for what that costs when the backend does not exist.            │
+│  [Confidence]                                                                │
+│    ★★★★☆  80%                                                                │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘

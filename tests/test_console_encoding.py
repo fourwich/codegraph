@@ -58,7 +58,13 @@ def _seed_graph(root: Path) -> None:
 
 
 def test_why_handles_non_utf8_stdout(tmp_path: Path) -> None:
-    """A GBK stdout must render the card instead of raising."""
+    """A GBK console must render the card instead of raising.
+
+    The stream is reconfigured to UTF-8, so the bytes come back as UTF-8 even
+    though the console was asked for GBK. That is the fix: the card used to die
+    on `UnicodeEncodeError` when it hit an emoji, and once that was swallowed the
+    separators arrived as mojibake (`·` read as `路`).
+    """
     _seed_graph(tmp_path)
     env = {
         **os.environ,
@@ -71,10 +77,34 @@ def test_why_handles_non_utf8_stdout(tmp_path: Path) -> None:
         env=env,
         capture_output=True,
     )
-    stdout = result.stdout.decode("gbk", errors="replace")
-    stderr = result.stderr.decode("gbk", errors="replace")
+    text = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
 
     assert "UnicodeEncodeError" not in stderr, stderr
     assert result.returncode == 0, stderr
-    assert "[OK] active" in stdout
-    assert "cached slice" in stdout
+    assert "\ufffd" not in text, "output was not encodable as UTF-8"
+    assert "active" in text
+    assert "cached slice" in text
+
+
+def test_index_output_on_a_gbk_console_has_no_mojibake(tmp_path: Path) -> None:
+    """`·` must not arrive as `路` when the console is GBK."""
+    _seed_graph(tmp_path)
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "gbk",
+        "PYTHONPATH": str(REPO_ROOT / "src"),
+    }
+    result = subprocess.run(
+        [sys.executable, "-m", "codegraph.cli", "index", ".", "--depth", "3", "--full"],
+        cwd=str(tmp_path),
+        env=env,
+        capture_output=True,
+    )
+    text = result.stdout.decode("utf-8", errors="replace") + result.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+    assert result.returncode == 0, text
+    assert "\ufffd" not in text
+    assert "路" not in text, "middle dot decoded as a Chinese character"

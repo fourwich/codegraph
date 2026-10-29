@@ -29,6 +29,16 @@
 - `codegraph graph` and `codegraph decisions` gained `--json`, joining `why` and `index`. All four decision payloads now come from one serializer, and the shapes are documented in [json-contract.md](docs/json-contract.md) and pinned by tests, so the editor extension has a stable contract instead of whatever the models happen to emit.
 - Decision text is polished at extraction time: structural section headings are dropped (`Changed: …`, `🚀 Improvements: …`), sentences are capitalised unless they start with a name (`demo.html`), and clause fragments are no longer stored as decisions (`now bracket the range`, `Same run`, `Update`). A plain commit subject is still kept as a history event — only decisions have to read as a statement.
 - Changelog discovery is case-insensitive. Express ships `History.md`; a case-sensitive lookup found it on Windows but not on macOS or Linux, so the same checkout produced different graphs per platform. Reading it took Express from 5 decisions to **22 of 242**, 17 of them bound to a code line.
+- Console output is now UTF-8 on a non-UTF-8 console. On Chinese Windows (GBK)
+  the middle dot arrived as a Chinese character (· read as 路) in any redirected
+  log, and characters GBK cannot encode (•, ✅) raised UnicodeEncodeError
+  mid-card. Both came from errors="replace" without reconfiguring the
+  encoding; the streams are reconfigured to UTF-8 instead.
+- The README shows real screenshots, generated from captured output rather
+  than drawn: docs/assets/captures/*.txt hold text produced by an actual
+  run, scripts/render_terminal_svg.py embeds it in an SVG, and CI
+  re-renders and fails if the images no longer match. Captures use --full
+  so the same command does not report a different graph on a cold database.
 - Clause tails are trimmed before a record is stored: a sentence split at
   "because" left reasons such as "to avoid errors from version mismatches (e.g."
   hanging inside a parenthesis. Unbalanced brackets and trailing connectors are

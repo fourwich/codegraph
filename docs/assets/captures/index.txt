@@ -1,0 +1,14 @@
+Indexing D:\CodeGraph ... depth=50
+  Indexing
+  Walk Git history
+  Parse snapshots with tree-sitter
+  Extract decisions from commits/ADRs
+  Write graph store
+
+Index complete  D:\CodeGraph
+  · Commits walked: 50
+  · Nodes: 1457
+  · Edges: 3050
+  · Decisions: 84
+  · Database: D:\CodeGraph\.codegraph\graph.db
+Next: codegraph why <file>:<line>  to view a decision card
