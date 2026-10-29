@@ -33,6 +33,8 @@ export interface WhyResult {
   node: CodeNodeInfo | null;
   decisions: DecisionCard[];
   binding?: string;
+  /** Decisions that govern the whole file, when nothing is bound to the line. */
+  related?: DecisionCard[];
 }
 
 export interface IndexResult {

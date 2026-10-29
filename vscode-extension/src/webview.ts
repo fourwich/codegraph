@@ -27,9 +27,18 @@ function card(d: DecisionCard): string {
 
 export function renderWhyHtml(result: WhyResult, snippet: string): string {
   const decisions = result.decisions || [];
-  const body = decisions.length
-    ? decisions.map(card).join("")
-    : `<p class="empty">No decision record found</p>`;
+  const related = result.related || [];
+  let body: string;
+  if (decisions.length) {
+    body = decisions.map(card).join("");
+  } else if (related.length) {
+    body =
+      `<p class="empty">No record is tied to this line, but this file is governed by:</p>` +
+      related.map(card).join("");
+  } else {
+    body = `<p class="empty">No decision record found</p>`;
+  }
+  const binding = result.binding && result.binding !== "none" ? ` · ${esc(result.binding)}` : "";
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/>
 <style>
@@ -42,7 +51,7 @@ export function renderWhyHtml(result: WhyResult, snippet: string): string {
   button { margin-top: 8px; }
 </style></head><body>
   <h2>CodeGraph decision</h2>
-  <div class="meta">${esc(result.file)}:${result.line}</div>
+  <div class="meta">${esc(result.file)}:${result.line}${binding}</div>
   ${result.node ? `<div class="meta">${esc(result.node.kind)} ${esc(result.node.name)} · ${esc(result.node.commit_sha || "")}</div>` : ""}
   <pre>${esc(snippet)}</pre>
   ${body}
