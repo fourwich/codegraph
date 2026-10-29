@@ -29,6 +29,16 @@
 - `codegraph graph` and `codegraph decisions` gained `--json`, joining `why` and `index`. All four decision payloads now come from one serializer, and the shapes are documented in [json-contract.md](docs/json-contract.md) and pinned by tests, so the editor extension has a stable contract instead of whatever the models happen to emit.
 - Decision text is polished at extraction time: structural section headings are dropped (`Changed: …`, `🚀 Improvements: …`), sentences are capitalised unless they start with a name (`demo.html`), and clause fragments are no longer stored as decisions (`now bracket the range`, `Same run`, `Update`). A plain commit subject is still kept as a history event — only decisions have to read as a statement.
 - Changelog discovery is case-insensitive. Express ships `History.md`; a case-sensitive lookup found it on Windows but not on macOS or Linux, so the same checkout produced different graphs per platform. Reading it took Express from 5 decisions to **22 of 242**, 17 of them bound to a code line.
+- Clause tails are trimmed before a record is stored: a sentence split at
+  "because" left reasons such as "to avoid errors from version mismatches (e.g."
+  hanging inside a parenthesis. Unbalanced brackets and trailing connectors are
+  removed without inventing text, and the same cleanup runs on content and
+  alternatives -- but never changes an identifier's spelling.
+- A fifth measured project, google/gson (Java), closes the ecosystem gap: 8439
+  nodes / 78211 edges / 223 records / **29 decisions** (13.0%), 23 of them bound
+  to code. Ten of the decisions come from javadoc comments that explain a design
+  choice, which is the comment extractor working on a language it had not been
+  measured on before.
 - Fixed a crash on real repositories: `decision_code_links` is unique on (decision, file, line) and two nodes can share a start line — a class and its first method — which aborted `index` with an `IntegrityError`. Duplicate line links are now collapsed at the write boundary, keeping the first node.
 - Prose decisions bind through a backticked symbol name that is **unique** in the graph, even when it is short and lowercase (`redirect`), while a name shared by several files still needs the distinctive spelling. Flask: 6 → 10 of 56 decisions reachable from a code line.
 

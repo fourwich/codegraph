@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **191 tests passing** · **8 CLI commands** · **7 languages**
+Verified locally: **201 tests passing** · **8 CLI commands** · **7 languages**
 
 ---
 
@@ -44,7 +44,7 @@ I built CodeGraph in stages so each one stayed runnable.
 5. **Web + export** — `codegraph serve` (FastAPI + Cytoscape) and `codegraph export --for-ai` context packs for coding agents.
 6. **Editor + LLM** — VSCode “Show decision” using JSON output; optional Ollama extraction (`--use-llm`) that degrades to rules when offline.
 
-Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **191 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
+Each stage shipped with tests. Parallel parsing (`--jobs`) and incremental HEAD state exist for larger trees, but this repository’s self-index is still the demo path. Today the test suite reports **201 passing tests**. The CLI exposes **eight commands**: `index`, `why`, `graph`, `decisions`, `conflicts`, `export`, `serve`, and `diff`.
 
 ### Challenges I faced
 
@@ -71,7 +71,7 @@ can be checked in the repository.
 
 **Effort and work ethic (40%)**
 
-- **191 tests**, over 80% coverage of `src/codegraph`, and a CI matrix of six jobs
+- **201 tests**, over 80% coverage of `src/codegraph`, and a CI matrix of six jobs
   (Ubuntu/Windows/macOS × Python 3.10/3.12) that is green. The lint step had been
   failing since September 24 — 26 consecutive red runs in which `mypy` and
   `pytest` never executed. A third-party review is how I found that, and fixing
@@ -92,10 +92,11 @@ can be checked in the repository.
 - The pipeline is real, not a mock: tree-sitter parses seven languages, GitPython
   walks actual history, SQLite stores versioned nodes, and `graph --at` filters by
   `valid_from` / `valid_to`.
-- Measured on four real repositories across four languages, not a fixture:
+- Measured on five real repositories across five languages, not a fixture:
   Express 5920 nodes / 1460 edges / 242 records in ~60 s; `got` 19142 / 65878 /
-  237 in 75 s; Flask 7546 / 19840 / 231 in 37 s; cobra 5218 / 20989 / 220 in 38 s. Reproduce with the
-  commands in [benchmarks](benchmarks.md).
+  237 in 75 s; Flask 7546 / 19840 / 229 in 37 s; cobra 5218 / 20989 / 217 in 38 s;
+  gson 8439 / 78211 / 223 in 38 s. Reproduce with the commands in
+  [benchmarks](benchmarks.md).
 - Interfaces beyond the CLI: a FastAPI + Cytoscape web UI with a timeline slider,
   and a VSCode extension driven by `why --json`.
 
@@ -105,7 +106,7 @@ can be checked in the repository.
   name and a date, and the reason is somewhere else.
 - Precision is measured instead of claimed: on Express, **22 decisions out of 242
   records** (the honest number, down from an inflated 174); on `got`, **36 of
-  237**; on Flask, **54 of 229**; on cobra, **12 of 217**. No per-repository tuning — the extractor reads
+  237**; on Flask, **54 of 229**; on cobra, **12 of 217**; on gson, **29 of 223**. No per-repository tuning — the extractor reads
   the rationale each project already writes down. All three reproduce with
   `scripts/eval_decision_precision.py`.
 - When there is no record, the tool says so — and now falls back to the decisions
@@ -165,4 +166,4 @@ I would define the versioned-node schema on day one, and add `--json` earlier so
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (191 tests, 8 commands, 7 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (201 tests, 8 commands, 7 languages).

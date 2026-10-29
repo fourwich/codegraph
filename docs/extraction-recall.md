@@ -38,19 +38,21 @@ state a reason — in which case they are dependency **decisions**.
 | pallets/flask | 200 | 229 | **54** | 23.6% | 18 | 37 |
 | spf13/cobra | 200 | 217 | **12** | 5.5% | 8 | 4 |
 | expressjs/express | 200 | 242 | **22** | 9.1% | 14 | 8 |
-| CodeGraph self | 50 | 79 | **19** | 24.1% | 10 | 15 |
+| google/gson | 200 | 223 | **29** | 13.0% | 19 | 10 |
+| CodeGraph self | 50 | 81 | **20** | 24.7% | 11 | 15 |
 
-The four projects bracket the product's actual range, which is why all of them
+The five projects bracket the product's actual range, which is why all of them
 are here rather than only the flattering one. Express writes free-form commit
 subjects, so 22 of its 242 records carry a rationale — and 17 of those 22 come
 from its own `History.md`, which states reasons in release notes. `got` writes
 conventional commits whose bodies explain the change: 36 of 237. Flask documents
 every release in `CHANGES.rst`, a reStructuredText file, so 54 of 229 records
 state a reason or a rejected alternative. Cobra is the other direction again —
-short Go commit subjects, terse notes — and only 12 of 217. None of the four is
-configured for: the extractor reads what the project already writes down. Four
-projects across TypeScript, JavaScript, Python and Go also exercise four of the
-seven parsers end to end on real code.
+short Go commit subjects, terse notes — and only 12 of 217. Gson sits in between:
+29 of 223, ten of them read from javadoc comments that explain a design choice.
+None of the five is configured for: the extractor reads what the project already
+writes down. Five projects across TypeScript, JavaScript, Python, Go and Java also
+exercise five of the seven parsers end to end on real code.
 
 The flask row is also a bug report: before `CHANGES.rst` support existed, the
 same checkout produced **one** decision, because the extractor looked only at
@@ -65,7 +67,7 @@ yields 242 records of which **22** are decisions — and the 22 are the ones tha
 state a reason or a rejected alternative, mostly in Express's own changelog. The
 number fell from 174 to 22 because the other 220 records are history, not choices.
 
-The self repo's 19 decisions are 6 ADRs, 11 CHANGELOG entries and 2 commit bodies —
+The self repo's 20 decisions are 6 ADRs, 11 CHANGELOG entries and 3 commit bodies —
 sources that are handwritten rather than scraped from commit subjects, which is
 also why most of them are reachable from `why`.
 
@@ -89,7 +91,7 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-18 of the 21 decision-tier records have line links: 4 ADRs through their
+17 of the 20 decision-tier records have line links: 4 ADRs through their
 `governs:` declaration, and the CHANGELOG entries through the lines they touched.
 So `why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
 unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
@@ -99,7 +101,7 @@ Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 3322 |
+| `decision_code_links` rows | 9323 | 3094 |
 | widest single record | 3233 links / 46 files | 240 links / 4 files |
 
 Binding is the weakest part of a changelog-only corpus: Flask has 54 decisions and
@@ -138,7 +140,7 @@ gate, so "nothing here" and "cannot see it" are distinguishable:
 
 | Repository | Decisions | Conflicts | Same-place pairs | Pairs with opposite terms | Rejected by topic gate |
 |---|---|---|---|---|---|
-| CodeGraph self | 19 | **1** | 81 | 1 | 0 |
+| CodeGraph self | 20 | **1** | 93 | 1 | 0 |
 | expressjs/express | 21 | 0 | 153 | 0 | 0 |
 | pallets/flask | 54 | 0 | 1431 | 0 | 0 |
 | sindresorhus/got | 36 | 0 | 229 | 3 | **3** |

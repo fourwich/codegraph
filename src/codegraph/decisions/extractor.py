@@ -241,17 +241,64 @@ def decision_text_body(text: str) -> str:
     return match.group("body").strip()
 
 
+_DANGLING_TAIL = frozenset(
+    {
+        "and",
+        "or",
+        "but",
+        "with",
+        "without",
+        "to",
+        "of",
+        "for",
+        "in",
+        "on",
+        "at",
+        "by",
+        "as",
+        "than",
+        "the",
+        "a",
+        "an",
+        "e.g",
+        "i.e",
+        "such",
+        "like",
+        "including",
+    }
+)
+
+
+def clean_clause(text: str) -> str:
+    """Trim a clause that was cut mid-phrase.
+
+    A sentence split at "because" or "instead of" can leave a dangling tail:
+    "to avoid errors from version mismatches (e.g." ends inside a parenthesis and
+    on a conjunction. An unbalanced open bracket is removed with everything after
+    it, and trailing connector words are dropped, so a card never ends mid-thought.
+    """
+    value = " ".join((text or "").split()).strip()
+    while value.count("(") > value.count(")") and "(" in value:
+        value = value[: value.rfind("(")].strip()
+    words = value.rstrip(" .,;:").split()
+    while words and words[-1].lower().strip(".,;:") in _DANGLING_TAIL:
+        words.pop()
+    return " ".join(words).rstrip(" .,;:")
+
+
 def polish_decision_content(text: str) -> str:
     """Make a decision read like a sentence instead of a clause fragment.
 
-    Structural headings are dropped, sentences are capitalised, and trailing
-    punctuation is trimmed. Version headings ("Version 3.2.0: ...") are kept,
-    because they tell the reader which release introduced the change.
+    Structural headings are dropped, dangling clause tails are trimmed, sentences
+    are capitalised, and trailing punctuation is removed. Version headings
+    ("Version 3.2.0: ...") are kept, because they tell the reader which release
+    introduced the change.
     """
     value = " ".join((text or "").split()).strip().rstrip(_TRAILING)
     match = _SECTION_PREFIX.match(value)
     if match and _section_head(match.group("head")) in _STRUCTURAL_SECTIONS:
         value = match.group("body").strip()
+    value = clean_clause(value)
     first = value.split(" ", 1)[0] if value else ""
     # demo.html and --file are names, not sentences: capitalising them would
     # rename the thing the card is about.
@@ -266,9 +313,9 @@ def polish_alternative(text: str) -> str:
 
     Alternatives are frequently package names or identifiers (`safe-buffer`,
     `setuptools`), so capitalising them would change what they name. Only
-    whitespace and a trailing full stop are normalised.
+    whitespace and a dangling tail are normalised.
     """
-    return " ".join((text or "").split()).strip().rstrip(".")
+    return clean_clause(" ".join((text or "").split()).strip().rstrip("."))
 
 
 def is_usable_decision_content(text: str) -> bool:
@@ -367,6 +414,7 @@ def decision_from_sentence(
             (reason or rejected alternative => decision, otherwise event).
     """
     raw_content, reason, alternatives = split_decision_parts(sentence)
+    reason = clean_clause(reason)
     content = polish_decision_content(raw_content)
     alternatives = [polish_alternative(a) for a in alternatives if a.strip()]
     if len(content) > 220:

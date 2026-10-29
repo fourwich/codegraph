@@ -142,28 +142,29 @@ An empty answer is not a dead end: when nothing is bound to the queried line,
 `why` reports the decisions bound to the file, so a line inside a governed module
 still returns that module's ADR rather than nothing at all.
 
-## Three more projects, measured the same way
+## Four more projects, measured the same way
 
 Express is the hard case: free-form commit subjects, no ADR directory. A single
 project cannot show whether the extractor generalizes, so the same commands were
 run on `sindresorhus/got` (TypeScript, conventional commits with explanatory
-bodies), `pallets/flask` (Python, release notes in `CHANGES.rst`) and
-`spf13/cobra` (Go, terse subjects).
+bodies), `pallets/flask` (Python, release notes in `CHANGES.rst`), `spf13/cobra`
+(Go, terse subjects) and `google/gson` (Java, javadoc comments that explain a
+choice).
 
-| | expressjs/express | sindresorhus/got | pallets/flask | spf13/cobra |
-|---|---|---|---|---|
-| Commits indexed | 200 | 200 | 200 | 200 |
-| Nodes | 5920 | 19142 | 7546 | 5218 |
-| Edges | 1460 | 65878 | 19840 | 20989 |
-| Records | 242 | 237 | 229 | 217 |
-| **Decisions** | **22** (9.1%) | **36** (15.2%) | **54** (23.6%) | **12** (5.5%) |
-| Index wall time | ~60 s | 75 s | 37 s | 38 s |
+| | expressjs/express | sindresorhus/got | pallets/flask | spf13/cobra | google/gson |
+|---|---|---|---|---|---|
+| Commits indexed | 200 | 200 | 200 | 200 | 200 |
+| Nodes | 5920 | 19142 | 7546 | 5218 | 8439 |
+| Edges | 1460 | 65878 | 19840 | 20989 | 78211 |
+| Records | 242 | 237 | 229 | 217 | 223 |
+| **Decisions** | **22** (9.1%) | **36** (15.2%) | **54** (23.6%) | **12** (5.5%) | **29** (13.0%) |
+| Index wall time | ~60 s | 75 s | 37 s | 38 s | 38 s |
 
 The difference is the input, not the configuration: `got` writes commit bodies
 that explain a change and Flask documents every release, so 36 of 237 and 54 of
 229 records state a reason or a rejected alternative; Express documents releases
-too (22 of 242), while cobra writes short subjects, so only 12 of 217. Nothing was
-tuned for any repository.
+too (22 of 242), gson's javadoc explains design choices (29 of 223), and cobra
+writes short subjects, so only 12 of 217. Nothing was tuned for any repository.
 
 Flask also exposed a real gap. Before `CHANGES.rst` support existed the same
 checkout produced **one** decision, because the extractor looked only for
