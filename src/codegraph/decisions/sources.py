@@ -46,10 +46,18 @@ _MD_HEADING = re.compile(r"^(?P<hashes>#{1,4})\s+(?P<title>.+?)\s*#*$", re.MULTI
 
 
 def _changelog_path(repo_path: Path) -> Path | None:
-    """Return the first conventional changelog file that exists."""
+    """Return the first conventional changelog file that exists.
+
+    The comparison is case-insensitive on purpose: Express ships `History.md`
+    and a case-sensitive lookup would find it on Windows but not on macOS or
+    Linux, so the same repository produced different graphs per platform.
+    """
+    if not repo_path.is_dir():
+        return None
+    by_lower = {path.name.lower(): path for path in repo_path.iterdir() if path.is_file()}
     for name in CHANGELOG_NAMES:
-        candidate = repo_path / name
-        if candidate.is_file():
+        candidate = by_lower.get(name.lower())
+        if candidate is not None:
             return candidate
     return None
 

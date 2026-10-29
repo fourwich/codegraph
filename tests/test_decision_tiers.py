@@ -55,7 +55,8 @@ def test_subject_with_rejected_alternative_is_a_decision() -> None:
     """'instead of X' is a recorded alternative, so it becomes a decision."""
     decision = _subject("refactor: use node:buffer instead of safe-buffer (#6071)")
     assert decision.tier is DecisionTier.DECISION
-    assert decision.content == "use node:buffer"
+    # Content is polished so a card starts with a capital; the rest is unchanged.
+    assert decision.content == "Use node:buffer"
     assert decision.alternatives == ["safe-buffer (#6071)"]
     assert decision.confidence == 0.6
 

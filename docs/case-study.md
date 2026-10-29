@@ -12,7 +12,7 @@ Express is one of the most widely used Node.js web frameworks. Its Git history s
 - Files parsed: JavaScript under `lib/`, `examples/`, root
 - Nodes: **5920** node versions
 - Edges: **1460** (both endpoints stored; 537 of the 776 `uses` edges cross a file boundary)
-- Records: **204** = **5 decisions** + **199 history events**
+- Records: **242** = **22 decisions** + **220 history events**
 - Languages: JavaScript (`.js` / `.mjs` / `.cjs`)
 - Index wall time: **~60 s** (includes historical snapshots)
 
@@ -106,13 +106,15 @@ Honest result: Express `lib/` did not produce contradictory accepted decisions u
 
 ## Limitations observed
 
-- Express commit messages often lack *because / instead of* wording, so 199 of
-  204 records are history events rather than decisions. Precision now costs
+- Express commit messages often lack *because / instead of* wording, so 220 of
+  242 records are history events rather than decisions. Precision now costs
   recall: the tool says "I don't know" more often, and that is deliberate.
-- 5 of the 5 Express decisions have no line links at all (every one of its 199
-  `decision_code_links` rows belongs to an event-tier record), so `why` reaches a
-  decision through the commit- or file-level fallback and labels the binding
-  accordingly.
+- Its release notes are the exception. `History.md` states reasons and rejected
+  alternatives, so 22 of the 242 records are decisions and **17 of those 22 bind
+  to a code line**, because the notes name `encodeurl`, `body-parser` and friends.
+  Before changelog discovery became case-insensitive the same checkout produced 5
+  decisions and zero line links — the file is `History.md`, and a case-sensitive
+  lookup found it on Windows but not on macOS or Linux.
 - ADR and CHANGELOG decisions have no commit of their own. They bind only to code
   they name — a `governs:` declaration, a backticked path, or a distinctive
   backticked identifier. Express has no ADR directory, so nothing there is
@@ -153,14 +155,15 @@ bodies), `pallets/flask` (Python, release notes in `CHANGES.rst`) and
 | Commits indexed | 200 | 200 | 200 | 200 |
 | Nodes | 5920 | 19142 | 7546 | 5218 |
 | Edges | 1460 | 65878 | 19840 | 20989 |
-| Records | 204 | 237 | 231 | 220 |
-| **Decisions** | **5** (2.5%) | **36** (15.2%) | **56** (24.2%) | **15** (6.8%) |
+| Records | 242 | 237 | 229 | 217 |
+| **Decisions** | **22** (9.1%) | **36** (15.2%) | **54** (23.6%) | **12** (5.5%) |
 | Index wall time | ~60 s | 75 s | 37 s | 38 s |
 
 The difference is the input, not the configuration: `got` writes commit bodies
-that explain a change and Flask documents every release, so 36 of 237 and 56 of
-231 records state a reason or a rejected alternative; cobra writes short subjects,
-so 15 of 220. Nothing was tuned for any repository.
+that explain a change and Flask documents every release, so 36 of 237 and 54 of
+229 records state a reason or a rejected alternative; Express documents releases
+too (22 of 242), while cobra writes short subjects, so only 12 of 217. Nothing was
+tuned for any repository.
 
 Flask also exposed a real gap. Before `CHANGES.rst` support existed the same
 checkout produced **one** decision, because the extractor looked only for

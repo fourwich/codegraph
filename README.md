@@ -1,17 +1,17 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-175%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-191%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
 
-Why not just ask an AI? Because AI cannot read a closed issue from two years ago — and because a commit subject is not an answer. CodeGraph shows a decision card only when the record states a reason or a rejected alternative; everything else is kept as history you can ask for explicitly. On Express.js that means **5 decisions out of 204 records**, not 174 "decisions" that were mostly version bumps.
+Why not just ask an AI? Because AI cannot read a closed issue from two years ago — and because a commit subject is not an answer. CodeGraph shows a decision card only when the record states a reason or a rejected alternative; everything else is kept as history you can ask for explicitly. On Express.js that means **22 decisions out of 242 records**, not 174 "decisions" that were mostly version bumps.
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 175 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 191 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -26,7 +26,7 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ```bash
 pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
-pytest -q                   # 175 tests, no network needed
+pytest -q                   # 191 tests, no network needed
 codegraph index .           # builds the graph for this repository
 codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
@@ -39,7 +39,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (175 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (191 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -50,7 +50,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 175 tests passing
+- [x] 191 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)

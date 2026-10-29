@@ -119,6 +119,177 @@ def looks_like_decision(sentence: str) -> bool:
     return any(k in lower for k in DECISION_KEYWORDS)
 
 
+_STRUCTURAL_SECTIONS = frozenset(
+    {
+        "changed",
+        "changes",
+        "removed",
+        "added",
+        "fixed",
+        "deprecated",
+        "security",
+        "breaking",
+        "unreleased",
+        "changelog",
+        "notes",
+        "improvements",
+        "improvement",
+        "features",
+        "feature",
+        "bug fixes",
+        "bugfixes",
+        "fixes",
+        "docs",
+        "documentation",
+        "performance",
+        "tests",
+        "refactor",
+        "maintenance",
+        "dependencies",
+        "deps",
+        "breaking changes",
+        "other changes",
+    }
+)
+_SECTION_PREFIX = re.compile(r"^(?P<head>[^:]{1,40}):\s+(?P<body>\S.*)$")
+# A sentence cut mid-clause starts with one of these; a real decision does not.
+_FRAGMENT_LEADS = frozenset(
+    {
+        "now",
+        "also",
+        "thus",
+        "so",
+        "then",
+        "therefore",
+        "however",
+        "instead",
+        "further",
+        "additionally",
+        "moreover",
+    }
+)
+_IDENTIFIER_HINT = re.compile(r"[A-Z0-9_`\[\]()\-]")
+_TRAILING = " .,;:"
+# "use sqlite" is two words but a statement; "same run" is two words of debris.
+_DECISION_VERBS = frozenset(
+    {
+        "use",
+        "prefer",
+        "switch",
+        "replace",
+        "drop",
+        "remove",
+        "add",
+        "keep",
+        "avoid",
+        "revert",
+        "migrate",
+        "adopt",
+        "choose",
+        "chose",
+        "disable",
+        "enable",
+        "store",
+        "parse",
+        "cache",
+        "bump",
+        "rename",
+        "move",
+        "require",
+        "allow",
+        "reject",
+        "deprecate",
+        "support",
+        "expose",
+        "return",
+        "accept",
+        "validate",
+        "configure",
+        "defer",
+        "merge",
+        "split",
+        "extract",
+        "load",
+        "run",
+    }
+)
+
+
+_HEAD_NOISE = re.compile(r"[^\w\s]+")
+
+
+def _section_head(head: str) -> str:
+    """Normalise a section heading for lookup: drop emoji, symbols and case.
+
+    Release logs are full of "🚀 Improvements:" and "Bug fixes:"; the emoji should
+    not stop the heading from being recognised as structural noise.
+    """
+    cleaned = _HEAD_NOISE.sub(" ", head or "")
+    return " ".join(cleaned.split()).strip().lower()
+
+
+def decision_text_body(text: str) -> str:
+    """Return the statement part of a decision, without a section heading.
+
+    Changelog extraction passes "Changed: bullet" and "Version 3.2.0: bullet" in,
+    so the heading has to be recognised for both the readability fix (a card
+    should not read "Changed: ...") and the fragment check.
+    """
+    match = _SECTION_PREFIX.match(text or "")
+    if not match:
+        return (text or "").strip()
+    return match.group("body").strip()
+
+
+def polish_decision_content(text: str) -> str:
+    """Make a decision read like a sentence instead of a clause fragment.
+
+    Structural headings are dropped, sentences are capitalised, and trailing
+    punctuation is trimmed. Version headings ("Version 3.2.0: ...") are kept,
+    because they tell the reader which release introduced the change.
+    """
+    value = " ".join((text or "").split()).strip().rstrip(_TRAILING)
+    match = _SECTION_PREFIX.match(value)
+    if match and _section_head(match.group("head")) in _STRUCTURAL_SECTIONS:
+        value = match.group("body").strip()
+    first = value.split(" ", 1)[0] if value else ""
+    # demo.html and --file are names, not sentences: capitalising them would
+    # rename the thing the card is about.
+    is_name = any(ch in first for ch in "./_-`") or any(c.isupper() for c in first)
+    if value and value[0].isalpha() and value[0].islower() and not is_name:
+        value = value[0].upper() + value[1:]
+    return value
+
+
+def polish_alternative(text: str) -> str:
+    """Normalize an alternative without touching its spelling.
+
+    Alternatives are frequently package names or identifiers (`safe-buffer`,
+    `setuptools`), so capitalising them would change what they name. Only
+    whitespace and a trailing full stop are normalised.
+    """
+    return " ".join((text or "").split()).strip().rstrip(".")
+
+
+def is_usable_decision_content(text: str) -> bool:
+    """True when a decision's content stands on its own.
+
+    A decision card that reads "now bracket the range" or "Update" is worse than
+    no card: it teaches the reader to ignore the feature. Fragments are dropped
+    only for decisions — a plain commit subject is still kept as history.
+    """
+    raw = decision_text_body(" ".join((text or "").split()).strip().rstrip(_TRAILING))
+    words = raw.split()
+    if len(words) < 2:
+        return False
+    first = words[0].lower().strip(",")
+    if first in _FRAGMENT_LEADS:
+        return False
+    if len(words) >= 3 or first in _DECISION_VERBS:
+        return True
+    return any(_IDENTIFIER_HINT.search(w) for w in words)
+
+
 def split_content_reason(sentence: str) -> tuple[str, str]:
     """Split a rationale sentence into (content, reason)."""
     text = " ".join(sentence.strip().split())
@@ -188,16 +359,23 @@ def decision_from_sentence(
     confidence: float = 0.55,
     category: str = "design",
     tier: DecisionTier | None = None,
-) -> Decision:
-    """Build a Decision from one sentence.
+) -> Decision | None:
+    """Build a Decision from one sentence, or None for an unusable fragment.
 
     Args:
         tier: Force a tier; when omitted it is derived from the sentence
             (reason or rejected alternative => decision, otherwise event).
     """
-    content, reason, alternatives = split_decision_parts(sentence)
+    raw_content, reason, alternatives = split_decision_parts(sentence)
+    content = polish_decision_content(raw_content)
+    alternatives = [polish_alternative(a) for a in alternatives if a.strip()]
     if len(content) > 220:
         content = content[:217] + "..."
+    resolved_tier = tier or classify_tier(content, reason, alternatives)
+    # A decision has to read like a statement; a clause fragment is not one. Plain
+    # history (events) is kept even when terse, because it is still a record.
+    if resolved_tier is DecisionTier.DECISION and not is_usable_decision_content(raw_content):
+        return None
     uid = make_uid(file_path or source_ref, "decision", uid_prefix, max(line or 1, 1))
     uid = f"{uid}::{content_fingerprint(content)}"
     return Decision(
@@ -215,7 +393,7 @@ def decision_from_sentence(
         constraints=[],
         confidence=confidence,
         category=category,
-        tier=tier or classify_tier(content, reason, alternatives),
+        tier=resolved_tier,
     )
 
 
@@ -282,19 +460,19 @@ def decisions_from_commit_body(
             continue
         content, reason, alternatives = split_decision_parts(part)
         tier = classify_tier(content, reason, alternatives)
-        out.append(
-            decision_from_sentence(
-                part,
-                source=DecisionSource.COMMIT,
-                source_ref=source_ref,
-                timestamp=timestamp,
-                author=author,
-                file_path=file_path,
-                uid_prefix="commit-body",
-                confidence=0.7 if tier is DecisionTier.DECISION else 0.55,
-                tier=tier,
-            )
+        decision = decision_from_sentence(
+            part,
+            source=DecisionSource.COMMIT,
+            source_ref=source_ref,
+            timestamp=timestamp,
+            author=author,
+            file_path=file_path,
+            uid_prefix="commit-body",
+            confidence=0.7 if tier is DecisionTier.DECISION else 0.55,
+            tier=tier,
         )
+        if decision is not None:
+            out.append(decision)
     return out
 
 
@@ -320,20 +498,20 @@ def extract_decisions_from_text(
     for sentence in split_sentences(text):
         if not looks_like_decision(sentence):
             continue
-        found.append(
-            decision_from_sentence(
-                sentence,
-                source=source,
-                source_ref=source_ref,
-                timestamp=timestamp,
-                author=author,
-                file_path=file_path,
-                uid_prefix=source.value,
-                confidence=confidence,
-                category=category,
-                tier=tier,
-            )
+        decision = decision_from_sentence(
+            sentence,
+            source=source,
+            source_ref=source_ref,
+            timestamp=timestamp,
+            author=author,
+            file_path=file_path,
+            uid_prefix=source.value,
+            confidence=confidence,
+            category=category,
+            tier=tier,
         )
+        if decision is not None:
+            found.append(decision)
     return found
 
 

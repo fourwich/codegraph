@@ -599,13 +599,27 @@ def insert_decision_links(
     conn: sqlite3.Connection,
     links: list[tuple[str, str, str, int]],
 ) -> None:
-    """Insert (decision_uid, node_uid, file_path, line) rows."""
+    """Insert (decision_uid, node_uid, file_path, line) rows.
+
+    The table is unique on (decision_uid, file_path, line), and a decision can
+    legitimately reach two nodes that start on the same line — a class and its
+    first method, for example. Keep the first row for a given line instead of
+    letting the insert fail: one link is enough to answer "why" for that line.
+    """
     if not links:
         return
+    seen: set[tuple[str, str, int]] = set()
+    rows: list[tuple[str, str, str, int]] = []
+    for decision_uid, node_uid, file_path, line in links:
+        key = (decision_uid, file_path, line)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append((decision_uid, node_uid, file_path, line))
     conn.executemany(
         "INSERT INTO decision_code_links (decision_uid, node_uid, file_path, line) "
         "VALUES (?, ?, ?, ?)",
-        links,
+        rows,
     )
     conn.commit()
 
