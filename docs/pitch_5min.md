@@ -135,7 +135,7 @@ one slide.
 
 **On screen:** README status block and the live site.
 
-> Today: 164 tests, over 80% coverage, 8 commands, 7 languages, and a green CI matrix.
+> Today: 169 tests, over 80% coverage, 8 commands, 7 languages, and a green CI matrix.
 > Every number in the README is measured by a script, not typed by hand.
 >
 > What's next is publishing to PyPI so `pip install` works without cloning, and
@@ -151,5 +151,5 @@ one slide.
 > here?" with a decision card: the reason, the rejected alternative, and the commit
 > that introduced it. It parses seven languages, versions the graph from real Git
 > history so you can query any past date, and stays silent when no decision was
-> ever recorded. 164 tests, an honest precision number on Express.js, and a green
+> ever recorded. 169 tests, an honest precision number on Express.js, and a green
 > CI matrix. Decisions as data, not lost chat history.

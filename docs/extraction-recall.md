@@ -37,7 +37,7 @@ state a reason — in which case they are dependency **decisions**.
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
 | pallets/flask | 200 | 231 | **56** | 24.2% | 20 | 37 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 76 | **18** | 23.7% | 10 | 14 |
+| CodeGraph self | 50 | 79 | **19** | 24.1% | 10 | 15 |
 
 The three projects bracket the product's actual range, which is why all of them
 are here rather than only the flattering one. Express writes free-form commit
@@ -59,7 +59,7 @@ The old headline was "174 decisions on Express". Under the tier model the same
 run yields 204 records of which **5** are decisions: precision went up, and the
 number went down, which is the point.
 
-The self repo's 18 decisions are 6 ADRs, 10 CHANGELOG entries and 2 commit bodies —
+The self repo's 19 decisions are 6 ADRs, 10 CHANGELOG entries and 3 commit bodies —
 sources that are handwritten rather than scraped from commit subjects, which is
 also why most of them are reachable from `why`.
 
@@ -83,7 +83,7 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-16 of the 18 decision-tier records have line links: 4 ADRs through their
+17 of the 19 decision-tier records have line links: 4 ADRs through their
 `governs:` declaration, and the CHANGELOG entries through the lines they touched.
 So `why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
 unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
@@ -93,15 +93,17 @@ Line links per repository, same index run:
 
 | | before | after |
 |---|---|---|
-| `decision_code_links` rows | 9323 | 3014 |
+| `decision_code_links` rows | 9323 | 3317 |
 | widest single record | 3233 links / 46 files | 240 links / 4 files |
 
 Binding is the weakest part of a changelog-only corpus: Flask has 56 decisions and
-only **6** of them carry a line link, because a release note says "use `flit_core`
-instead of `setuptools`" without naming a file. They are still queryable — from
-`CHANGES.rst` itself — but `why` on a code line in Flask mostly answers "no
-record". That is the honest limit of reading rationale from prose that does not
-point at code.
+only **10** of them carry a line link. A release note that says "use `flit_core`
+instead of `setuptools`" names no file, so there is nothing to link to; one that
+backticks a symbol does bind when that name is unique in the graph (`` `redirect` ``
+binds, a word shared by several files like `` `send` `` does not). The rest stay
+queryable from `CHANGES.rst` itself, and `why` on a code line in Flask mostly
+answers "no record" — the honest limit of reading rationale from prose that does
+not point at code.
 
 Express tells a different story, and it is worth stating plainly: all 199 of its
 `decision_code_links` rows belong to **event**-tier records. Its 5 decisions have

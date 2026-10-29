@@ -415,11 +415,21 @@ def _governed_nodes(
                 add(file_path, node)
 
     for ident in BACKTICKED_IDENT.findall(text or ""):
-        if "." in ident or not is_distinctive_identifier(ident):
-            continue
         candidates = node_names.get(ident, [])
-        if not candidates or len({n.file_path for n in candidates}) > 3:
+        if not candidates and "." in ident:
+            # ``app.route`` names a symbol on a module; the last segment is the
+            # candidate, and it still has to be unique to bind.
+            candidates = node_names.get(ident.rsplit(".", 1)[-1], [])
+        if not candidates:
+            continue
+        files = {n.file_path for n in candidates}
+        if len(files) > 3:
             continue  # too generic to be evidence about code
+        # A name defined in exactly one file is unambiguous no matter how it is
+        # spelled, so short identifiers like `redirect` bind when they are unique.
+        unique = len(files) == 1 and len(ident) >= 4
+        if not unique and not is_distinctive_identifier(ident):
+            continue
         for node in candidates[:MAX_GOVERNED_NODES_PER_FILE]:
             add(node.file_path, node)
     return targets

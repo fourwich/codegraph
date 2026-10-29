@@ -70,9 +70,10 @@ catches.
   1. an explicit declaration — `governs: src/app.py, src/pkg/` in the front
      matter, or `<!-- governs: src/app.py -->` in the body;
   2. a backticked source path that exists in the graph;
-  3. a backticked identifier that matches a real node name **and** is distinctive
-     (CamelCase, snake_case, or at least 10 characters) and appears in at most
-     three files.
+  3. a backticked identifier that matches a real node name and appears in at most
+     three files, where either the name is **unique** in the graph (`redirect` is
+     specific if only one file defines it) or it is distinctive — CamelCase,
+     snake_case, or at least 10 characters.
 
   `why` treats "linked to the symbol covering this line" as line level, so a
   governed file answers for every symbol inside it.
@@ -141,7 +142,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 164 tests passing (`pytest -q`, over 80% coverage of `src/codegraph`) |
+| ✅ Done | 169 tests passing (`pytest -q`, over 80% coverage of `src/codegraph`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |
