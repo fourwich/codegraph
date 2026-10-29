@@ -7,3 +7,9 @@ codegraph graph --at YYYY-MM-DD [--scope path]
 ```
 
 Counts nodes **and** edges whose endpoints are valid at that date.
+
+`--json` emits the snapshot for scripts:
+
+```bash
+codegraph graph --at 2026-10-29 --scope src --json
+```

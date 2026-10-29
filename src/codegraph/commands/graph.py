@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from codegraph.models import CodeNode, Decision, select_decisions
+from codegraph.models import CodeNode, Decision, decision_to_dict, select_decisions
 from codegraph.storage import (
     connect,
     count_edges_at,
@@ -148,12 +148,18 @@ def graph_command(
         help="Path scope, e.g. src or src/auth",
         metavar="PATH",
     ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON instead of a table",
+    ),
 ) -> None:
     """Print a code-graph snapshot for a historical date and scope.
 
     Args:
         at: Snapshot date (YYYY-MM-DD).
         scope: Path prefix scope.
+        as_json: Emit JSON for editors and scripts.
     """
     try:
         at_date = parse_date(at)
@@ -165,6 +171,21 @@ def graph_command(
     node_count, edge_count, decision_count, sample, decisions = load_snapshot_sqlite(
         root, at_date, scope
     )
+
+    if as_json:
+        import json as jsonlib
+
+        payload = {
+            "date": at_date.isoformat(),
+            "scope": scope,
+            "nodes": node_count,
+            "edges": edge_count,
+            "decisions": decision_count,
+            "summary": summarize_changes(at_date, sample, decisions),
+            "decision_records": [decision_to_dict(d) for d in decisions],
+        }
+        typer.echo(jsonlib.dumps(payload, ensure_ascii=False, indent=2))
+        return
 
     console.print(build_graph_table(at_date, scope, node_count, edge_count, decision_count))
     console.print()

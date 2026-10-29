@@ -38,7 +38,7 @@ state a reason — in which case they are dependency **decisions**.
 | pallets/flask | 200 | 231 | **56** | 24.2% | 20 | 37 |
 | spf13/cobra | 200 | 220 | **15** | 6.8% | 8 | 7 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
-| CodeGraph self | 50 | 79 | **19** | 24.1% | 10 | 15 |
+| CodeGraph self | 50 | 81 | **21** | 25.9% | 10 | 17 |
 
 The four projects bracket the product's actual range, which is why all of them
 are here rather than only the flattering one. Express writes free-form commit
@@ -63,7 +63,7 @@ The old headline was "174 decisions on Express". Under the tier model the same
 run yields 204 records of which **5** are decisions: precision went up, and the
 number went down, which is the point.
 
-The self repo's 19 decisions are 6 ADRs, 10 CHANGELOG entries and 3 commit bodies —
+The self repo's 21 decisions are 6 ADRs, 11 CHANGELOG entries and 4 commit bodies —
 sources that are handwritten rather than scraped from commit subjects, which is
 also why most of them are reachable from `why`.
 
@@ -87,7 +87,7 @@ A record is only useful if a query can find it.
 
 Adding `<!-- governs: src/... -->` (or `governs: src/...` front matter) is the
 cheapest way to make an ADR answer for the code it describes. In this repository
-17 of the 19 decision-tier records have line links: 4 ADRs through their
+18 of the 21 decision-tier records have line links: 4 ADRs through their
 `governs:` declaration, and the CHANGELOG entries through the lines they touched.
 So `why src/codegraph/storage.py:200` returns ADR-001 instead of nothing. The two
 unbound ADRs (server-side sessions vs stateless JWT) are a deliberate conflicting
@@ -128,6 +128,27 @@ Now opposite terms match on word boundaries, the two decisions must share a file
 additionally require opposite terms — being close in time is not a contradiction.
 Result on this repository: **1 conflict**, the deliberate stateful-vs-stateless
 pair in `docs/adr/004` vs `docs/adr/005`.
+
+Zero conflicts on a repository is only meaningful if the detector could have found
+something. `scripts/eval_conflict_precision.py` reports the reported conflicts *and*
+every same-place pair that matched an opposite term but was rejected by the topic
+gate, so "nothing here" and "cannot see it" are distinguishable:
+
+| Repository | Decisions | Conflicts | Same-place pairs | Pairs with opposite terms | Rejected by topic gate |
+|---|---|---|---|---|---|
+| CodeGraph self | 21 | **1** | 82 | 1 | 0 |
+| expressjs/express | 4 | 0 | 0 | 0 | 0 |
+| pallets/flask | 56 | 0 | 1540 | 0 | 0 |
+| sindresorhus/got | 36 | 0 | 229 | 3 | **3** |
+| spf13/cobra | 15 | 0 | 14 | 0 | 0 |
+
+Flask is the interesting row: 1540 pairs of decisions in one file and not one pair
+uses opposite vocabulary, because its records are release notes rather than
+competing choices. `got` is the calibration check — three pairs share
+`always`/`never`, and all three are correctly rejected with a topic overlap of
+0.00–0.14 (`Infinity` stays a valid "never" count is not the opposite of starting
+a timeout). The detector is quiet because the corpus is quiet, not because it is
+blind.
 
 ## Sample decisions now captured on Express
 

@@ -152,6 +152,45 @@ def make_uid(file_path: str, kind: str, name: str, line_start: int, commit_sha: 
     return base
 
 
+def decision_to_dict(decision: Decision) -> dict:
+    """Serialize a Decision for every `--json` output.
+
+    One implementation so `why`, `graph` and `decisions` cannot drift apart; the
+    editor contract in `docs/json-contract.md` is exactly this shape.
+    """
+    return {
+        "uid": decision.uid,
+        "content": decision.content,
+        "reason": decision.reason,
+        "alternatives": decision.alternatives,
+        "status": decision.status.value,
+        "source": decision.source.value,
+        "source_ref": decision.source_ref,
+        "timestamp": decision.timestamp.isoformat(),
+        "author": decision.author,
+        "file_path": decision.file_path,
+        "line": decision.line,
+        "constraints": decision.constraints,
+        "confidence": decision.confidence,
+        "category": decision.category,
+        "tier": decision.tier.value,
+    }
+
+
+def node_to_dict(node: CodeNode) -> dict:
+    """Serialize a CodeNode for `--json` output."""
+    return {
+        "uid": node.uid,
+        "kind": node.kind,
+        "name": node.name,
+        "file_path": node.file_path,
+        "line_start": node.line_start,
+        "line_end": node.line_end,
+        "language": node.language,
+        "commit_sha": node.commit_sha,
+    }
+
+
 class DecisionChange(BaseModel):
     """A decision delta between two snapshots."""
 

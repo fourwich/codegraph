@@ -1,6 +1,6 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-169%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-175%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -11,7 +11,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 169 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 175 tests
 
 See [docs/architecture.md](docs/architecture.md) for the full architecture overview.
 
@@ -26,7 +26,7 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 
 ```bash
 pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
-pytest -q                   # 169 tests, no network needed
+pytest -q                   # 175 tests, no network needed
 codegraph index .           # builds the graph for this repository
 codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
@@ -34,11 +34,12 @@ codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
 
 Then: [the architecture](docs/architecture.md) ·
 [what was measured and what is still a limitation](docs/extraction-recall.md) ·
+[the JSON contract for editors](docs/json-contract.md) ·
 [the 5-minute pitch script](docs/pitch_5min.md).
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (169 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (175 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -49,7 +50,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 169 tests passing
+- [x] 175 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)

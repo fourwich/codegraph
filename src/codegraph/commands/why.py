@@ -17,6 +17,8 @@ from rich.text import Text
 from codegraph.models import (
     CodeNode,
     Decision,
+    decision_to_dict,
+    node_to_dict,
     normalize_location_path,
     select_decisions,
 )
@@ -462,39 +464,12 @@ def why_command(
 
 def _node_payload(node: CodeNode | None) -> dict | None:
     """Serialize a CodeNode for --json."""
-    if node is None:
-        return None
-    return {
-        "uid": node.uid,
-        "kind": node.kind,
-        "name": node.name,
-        "file_path": node.file_path,
-        "line_start": node.line_start,
-        "line_end": node.line_end,
-        "language": node.language,
-        "commit_sha": node.commit_sha,
-    }
+    return node_to_dict(node) if node is not None else None
 
 
 def _decision_payload(decision: Decision) -> dict:
     """Serialize a Decision for --json."""
-    return {
-        "uid": decision.uid,
-        "content": decision.content,
-        "reason": decision.reason,
-        "alternatives": decision.alternatives,
-        "status": decision.status.value,
-        "source": decision.source.value,
-        "source_ref": decision.source_ref,
-        "timestamp": decision.timestamp.isoformat(),
-        "author": decision.author,
-        "file_path": decision.file_path,
-        "line": decision.line,
-        "constraints": decision.constraints,
-        "confidence": decision.confidence,
-        "category": decision.category,
-        "tier": decision.tier.value,
-    }
+    return decision_to_dict(decision)
 
 
 def decisions_command(
@@ -515,6 +490,11 @@ def decisions_command(
         "--include-events",
         help="Include event records (plain history: commit subjects, changelog lines)",
     ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON instead of a table",
+    ),
 ) -> None:
     """List the decision evolution timeline, for one file or for everything.
 
@@ -523,6 +503,7 @@ def decisions_command(
         timeline: Emit oldest-first when true.
         include_dependency: Show dependency-bump decisions too.
         include_events: Show event-tier records too.
+        as_json: Emit JSON for editors and scripts.
     """
     prefix = normalize_location_path(file) if file else ""
     rows = [
@@ -535,12 +516,31 @@ def decisions_command(
         include_events=include_events,
         include_dependency=include_dependency,
     )
-    if not filtered:
+    if not filtered and not as_json:
         render_not_found(
             file or "this repository", hidden_records=max(len(rows) - len(filtered), 0)
         )
         raise typer.Exit(code=1)
     rows = filtered
+
+    if as_json:
+        import json as jsonlib
+
+        ordered_json = list(rows) if timeline else list(reversed(rows))
+        typer.echo(
+            jsonlib.dumps(
+                {
+                    "file": file or None,
+                    "count": len(ordered_json),
+                    "decisions": [decision_to_dict(d) for d in ordered_json],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        if not ordered_json:
+            raise typer.Exit(code=1)
+        return
 
     table = Table(title=f"Decision evolution · {file or 'all files'}")
     table.add_column("Date", style="cyan")

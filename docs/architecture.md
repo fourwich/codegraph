@@ -103,6 +103,10 @@ module docstring and the imports, not only for the functions it contains.
 
 ## Eight commands
 
+`why`, `index`, `graph` and `decisions` accept `--json`; the shapes are a contract
+for the editor extension and scripts, documented in
+[json-contract.md](json-contract.md) and pinned by `tests/test_json_contract.py`.
+
 | Command | Purpose |
 |---|---|
 | `codegraph index <path>` | Parse + ingest Git history + store |
@@ -142,7 +146,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | ✅ Done | Decision extraction from commits, ADRs, CHANGELOG, with a `decision` / `event` tier |
 | ✅ Done | ADR / CHANGELOG decisions bound to the code they declare with `governs:` |
 | ✅ Done | Real time-travel queries (`graph --at`) |
-| ✅ Done | 169 tests passing (`pytest -q`, over 80% coverage of `src/codegraph`) |
+| ✅ Done | 175 tests passing (`pytest -q`, over 80% coverage of `src/codegraph`) |
 | ✅ Done | Local web visualization (`codegraph serve`) |
 | ✅ Done | CLI output contract for editors: `--json` keeps stdout pure, `why` accepts absolute paths |
 | ✅ Done | VSCode extension + `why --json` (vsix installable) |
