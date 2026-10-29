@@ -498,7 +498,12 @@ def _decision_payload(decision: Decision) -> dict:
 
 
 def decisions_command(
-    file: str = typer.Option(..., "--file", help="File path", metavar="PATH"),
+    file: str = typer.Option(
+        "",
+        "--file",
+        help="File path (omit to list decisions for every file)",
+        metavar="PATH",
+    ),
     timeline: bool = typer.Option(False, "--timeline", help="Show oldest-first evolution"),
     include_dependency: bool = typer.Option(
         False,
@@ -511,19 +516,19 @@ def decisions_command(
         help="Include event records (plain history: commit subjects, changelog lines)",
     ),
 ) -> None:
-    """List the decision evolution timeline for a file.
+    """List the decision evolution timeline, for one file or for everything.
 
     Args:
-        file: Target file path.
+        file: Target file path; omitted means every file.
         timeline: Emit oldest-first when true.
         include_dependency: Show dependency-bump decisions too.
         include_events: Show event-tier records too.
     """
-    prefix = normalize_location_path(file)
+    prefix = normalize_location_path(file) if file else ""
     rows = [
         d
         for d in _load_all_decisions()
-        if d.file_path == prefix or d.file_path.startswith(prefix)
+        if not prefix or d.file_path == prefix or d.file_path.startswith(prefix)
     ]
     filtered = select_decisions(
         rows,
@@ -531,11 +536,13 @@ def decisions_command(
         include_dependency=include_dependency,
     )
     if not filtered:
-        render_not_found(file, hidden_records=max(len(rows) - len(filtered), 0))
+        render_not_found(
+            file or "this repository", hidden_records=max(len(rows) - len(filtered), 0)
+        )
         raise typer.Exit(code=1)
     rows = filtered
 
-    table = Table(title=f"Decision evolution · {file}")
+    table = Table(title=f"Decision evolution · {file or 'all files'}")
     table.add_column("Date", style="cyan")
     table.add_column("Status")
     table.add_column("Decision", overflow="fold")
