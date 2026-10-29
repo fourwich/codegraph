@@ -36,16 +36,20 @@ state a reason — in which case they are dependency **decisions**.
 |---|---|---|---|---|---|---|
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
 | pallets/flask | 200 | 231 | **56** | 24.2% | 20 | 37 |
+| spf13/cobra | 200 | 220 | **15** | 6.8% | 8 | 7 |
 | expressjs/express | 200 | 204 | **5** | 2.5% | 2 | 3 |
 | CodeGraph self | 50 | 79 | **19** | 24.1% | 10 | 15 |
 
-The three projects bracket the product's actual range, which is why all of them
+The four projects bracket the product's actual range, which is why all of them
 are here rather than only the flattering one. Express writes free-form commit
 subjects, so only 5 of 204 records carry a rationale. `got` writes conventional
 commits whose bodies explain the change: 36 of 237. Flask documents every release
 in `CHANGES.rst`, a reStructuredText file, so 56 of 231 records state a reason or
-a rejected alternative. None of the three is configured for — the extractor reads
-what the project already writes down.
+a rejected alternative. Cobra is the other direction again — short Go commit
+subjects, terse notes — and only 15 of 220. None of the four is configured for:
+the extractor reads what the project already writes down. Four projects across
+TypeScript, JavaScript, Python and Go also exercise four of the seven parsers
+end to end on real code.
 
 The flask row is also a bug report: before `CHANGES.rst` support existed, the
 same checkout produced **one** decision, because the extractor looked only at

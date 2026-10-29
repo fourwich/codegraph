@@ -140,26 +140,27 @@ An empty answer is not a dead end: when nothing is bound to the queried line,
 `why` reports the decisions bound to the file, so a line inside a governed module
 still returns that module's ADR rather than nothing at all.
 
-## Two more projects, measured the same way
+## Three more projects, measured the same way
 
 Express is the hard case: free-form commit subjects, no ADR directory. A single
 project cannot show whether the extractor generalizes, so the same commands were
 run on `sindresorhus/got` (TypeScript, conventional commits with explanatory
-bodies) and `pallets/flask` (Python, release notes in `CHANGES.rst`).
+bodies), `pallets/flask` (Python, release notes in `CHANGES.rst`) and
+`spf13/cobra` (Go, terse subjects).
 
-| | expressjs/express | sindresorhus/got | pallets/flask |
-|---|---|---|---|
-| Commits indexed | 200 | 200 | 200 |
-| Nodes | 5920 | 19142 | 7546 |
-| Edges | 1460 | 65878 | 19840 |
-| Records | 204 | 237 | 231 |
-| **Decisions** | **5** (2.5%) | **36** (15.2%) | **56** (24.2%) |
-| Index wall time | ~60 s | 75 s | 37 s |
+| | expressjs/express | sindresorhus/got | pallets/flask | spf13/cobra |
+|---|---|---|---|---|
+| Commits indexed | 200 | 200 | 200 | 200 |
+| Nodes | 5920 | 19142 | 7546 | 5218 |
+| Edges | 1460 | 65878 | 19840 | 20989 |
+| Records | 204 | 237 | 231 | 220 |
+| **Decisions** | **5** (2.5%) | **36** (15.2%) | **56** (24.2%) | **15** (6.8%) |
+| Index wall time | ~60 s | 75 s | 37 s | 38 s |
 
 The difference is the input, not the configuration: `got` writes commit bodies
-that explain a change, and Flask documents every release, so 36 of 237 and 56 of
-231 records state a reason or a rejected alternative. Nothing was tuned for any
-repository.
+that explain a change and Flask documents every release, so 36 of 237 and 56 of
+231 records state a reason or a rejected alternative; cobra writes short subjects,
+so 15 of 220. Nothing was tuned for any repository.
 
 Flask also exposed a real gap. Before `CHANGES.rst` support existed the same
 checkout produced **one** decision, because the extractor looked only for

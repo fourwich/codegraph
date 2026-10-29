@@ -92,9 +92,9 @@ can be checked in the repository.
 - The pipeline is real, not a mock: tree-sitter parses seven languages, GitPython
   walks actual history, SQLite stores versioned nodes, and `graph --at` filters by
   `valid_from` / `valid_to`.
-- Measured on three real repositories, not a fixture: Express 5920 nodes / 1460
-  edges / 204 records in ~60 s; `got` 19142 nodes / 65878 edges / 237 records in
-  75 s; Flask 7546 nodes / 19840 edges / 231 records in 37 s. Reproduce with the
+- Measured on four real repositories across four languages, not a fixture:
+  Express 5920 nodes / 1460 edges / 204 records in ~60 s; `got` 19142 / 65878 /
+  237 in 75 s; Flask 7546 / 19840 / 231 in 37 s; cobra 5218 / 20989 / 220 in 38 s. Reproduce with the
   commands in [benchmarks](benchmarks.md).
 - Interfaces beyond the CLI: a FastAPI + Cytoscape web UI with a timeline slider,
   and a VSCode extension driven by `why --json`.
@@ -105,7 +105,7 @@ can be checked in the repository.
   name and a date, and the reason is somewhere else.
 - Precision is measured instead of claimed: on Express, **5 decisions out of 204
   records** (the honest number, down from an inflated 174); on `got`, **36 of
-  237**; on Flask, **56 of 231**. No per-repository tuning — the extractor reads
+  237**; on Flask, **56 of 231**; on cobra, **15 of 220**. No per-repository tuning — the extractor reads
   the rationale each project already writes down. All three reproduce with
   `scripts/eval_decision_precision.py`.
 - When there is no record, the tool says so — and now falls back to the decisions
