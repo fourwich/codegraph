@@ -59,9 +59,12 @@ GOVERNS_COMMENT = re.compile(
     r"<!--\s*governs?\s*:\s*(?P<paths>.*?)\s*-->", re.IGNORECASE | re.DOTALL
 )
 BACKTICKED_PATH = re.compile(
-    r"`([A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|mjs|cjs|java|go|rs|cpp|cc|cxx|hpp|hh|hxx|h))`"
+    r"`{1,2}([A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|mjs|cjs|java|go|rs|cpp|cc|cxx|hpp|hh|hxx|h))`{1,2}"
 )
-BACKTICKED_IDENT = re.compile(r"`([A-Za-z_][A-Za-z0-9_.]*)`")
+# reStructuredText marks a literal with double backticks (``redirect``), markdown
+# with one. Matching only the single form meant a Python project's changelog —
+# Flask writes everything as ``name`` — bound far less than it should.
+BACKTICKED_IDENT = re.compile(r"`{1,2}([A-Za-z_][A-Za-z0-9_.]*)`{1,2}")
 
 
 def is_distinctive_identifier(ident: str) -> bool:

@@ -51,6 +51,8 @@
   measured on before.
 - Fixed a crash on real repositories: `decision_code_links` is unique on (decision, file, line) and two nodes can share a start line — a class and its first method — which aborted `index` with an `IntegrityError`. Duplicate line links are now collapsed at the write boundary, keeping the first node.
 - Prose decisions bind through a backticked symbol name that is **unique** in the graph, even when it is short and lowercase (`redirect`), while a name shared by several files still needs the distinctive spelling. Flask: 6 → 10 of 56 decisions reachable from a code line.
+- reStructuredText literals are read as identifiers: a Python changelog writes `` `redirect` `` with two backticks where markdown writes it with one, and only the single form was matched, so most of Flask's nameable decisions were invisible to the binder. The measured effect on binding is small — of its 54 decisions, 32 backticked words are not node names at all (HTTP methods, config keys, prose) — but the ones that do name code now reach it.
+- `scripts/sample_why.py` measures whether `why` **answers**, not just whether records bind: it asks about 40 real locations per repository (half of them decision-linked, half random live symbols) and classifies each reply. The results are published in [extraction-recall.md](docs/extraction-recall.md) instead of asserted: gson 40% line-level, express 27%, cobra 12%, flask 12%.
 
 ## Removed
 

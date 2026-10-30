@@ -120,6 +120,32 @@ notes name `encodeurl`, `body-parser` and friends. The lesson is about the input
 not the binder: prose that names a symbol binds; prose that describes behaviour
 without naming anything does not.
 
+## Does `why` actually answer? (sampled)
+
+Counting bound records says the binder works; it does not say the *command* is
+useful. `scripts/sample_why.py` asks `why` about 40 real locations per repository
+— half of them the exact lines a decision points at, half random live symbols — and
+classifies the answer. Running it is the honest test of the feature:
+
+| Repository | line-level card | file-level card | governed-file fallback | no record |
+|---|---|---|---|---|
+| google/gson | **40%** | 0% | 10% | 40% |
+| expressjs/express | **27%** | 10% | 40% | 22% |
+| spf13/cobra | 12% | **20%** | 50% | 17% |
+| pallets/flask | 12% | 0% | 20% | **67%** |
+
+The spread is the product's actual range, and the reason is structural. Gson's
+javadoc names the method it is attached to, so a comment decision lands on that
+method's line. Flask's `CHANGES.rst` names a symbol in only 8 of 54 decisions —
+of the 32 backticked words that are not node names at all, most are HTTP methods,
+config keys, or prose. A record can still be *correct* and unreachable from a line;
+`no record` is then the truthful answer, and the fallback at least names the
+decisions governing the file.
+
+Sampling only random source lines would have made this table look 20 points worse
+than reality, because a changelog decision links to one specific line. The script
+mixes both kinds for that reason.
+
 ## Conflict precision
 
 `codegraph conflicts` used raw substring matching: `use` fired inside `because`,
