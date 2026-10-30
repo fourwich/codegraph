@@ -88,9 +88,10 @@ timeline slider, and a VSCode extension that reads `codegraph why --json`.
 
 Verification
 
-207 tests, 86% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS × Python
-3.10/3.12). Every test count in the README is checked against the run that produced it
-by a script in CI, so a stale number fails the build. The README screenshots are
+207 tests, over 80% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS ×
+Python 3.10/3.12). Every test count in the README is checked against the run that
+produced it by a script in CI, so a stale number fails the build. The README
+screenshots are
 generated from captured CLI output, and CI re-renders them and fails if they drift.
 
 Repository: https://github.com/fourwich/codegraph
