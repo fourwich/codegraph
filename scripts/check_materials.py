@@ -94,11 +94,17 @@ def _coverage_from_xml(path: Path) -> int | None:
 
 
 def collected_test_count() -> int:
-    """Number of tests that ran (JUnit report when present, else a collect run)."""
+    """Number of tests that ran (JUnit report when present, else a collect run).
+
+    The fallback must select the same tests CI runs. Without the marker filter it
+    counted the `dgraph` tests too (212), while the docs quote the number CI
+    actually runs (207), so the check failed on Linux — where no JUnit artifact
+    was present — and passed locally, where one was.
+    """
     from_junit = _junit_test_count(ROOT / "tests.xml")
     if from_junit is not None:
         return from_junit
-    stdout = _pytest(["--collect-only", "-q"])
+    stdout = _pytest(["--collect-only", "-q", "-m", "not dgraph"])
     match = re.search(r"(\d+)\s+tests?\s+collected", stdout)
     if match is None:
         _diagnose("Could not read the collected test count", stdout)
