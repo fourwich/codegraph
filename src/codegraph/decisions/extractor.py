@@ -94,6 +94,37 @@ CONVENTIONAL_COMMIT = re.compile(
 BULLET_RE = re.compile(r"^\s*[-*+]\s+(?P<text>.+)$", re.MULTILINE)
 
 
+def join_wrapped_lines(text: str) -> str:
+    """Join hard-wrapped paragraph lines back into sentences.
+
+    A commit body is wrapped at ~72 columns, so one sentence spans several lines:
+
+        We want to have the "completion" command for such programs because it
+        will allow the completion of flags and of arguments (if provided
+        by the program).
+
+    Splitting per line produced a decision whose reason was just "because it".
+    Paragraphs are separated by a blank line, and a line opening a bullet starts
+    its own paragraph, so both stay distinct after joining.
+    """
+    out: list[str] = []
+    buffer: list[str] = []
+    for raw in (text or "").splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            if buffer:
+                out.append(" ".join(buffer))
+                buffer = []
+            continue
+        if _BULLET_PREFIX.match(line) and buffer:
+            out.append(" ".join(buffer))
+            buffer = []
+        buffer.append(line.strip())
+    if buffer:
+        out.append(" ".join(buffer))
+    return "\n\n".join(out)
+
+
 def split_sentences(text: str) -> list[str]:
     """Split text into sentence-like fragments, dropping list markers."""
     parts = [_BULLET_PREFIX.sub("", p).strip() for p in _SENTENCE_SPLIT.split(text)]
@@ -109,7 +140,10 @@ def split_commit_parts(message: str) -> tuple[str, list[str]]:
     if bullets:
         return subject, bullets
     if body:
-        return subject, [p for p in split_sentences(body) if p]
+        # Join the wrap before splitting: `_SENTENCE_SPLIT` breaks on newlines, so a
+        # sentence spanning two lines became a fragment ending mid-clause
+        # ("because it").
+        return subject, [p for p in split_sentences(join_wrapped_lines(body)) if p]
     return subject, []
 
 
