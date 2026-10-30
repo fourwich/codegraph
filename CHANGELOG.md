@@ -54,6 +54,9 @@
 - reStructuredText literals are read as identifiers: a Python changelog writes `` `redirect` `` with two backticks where markdown writes it with one, and only the single form was matched, so most of Flask's nameable decisions were invisible to the binder. The measured effect on binding is small — of its 54 decisions, 32 backticked words are not node names at all (HTTP methods, config keys, prose) — but the ones that do name code now reach it.
 - `scripts/sample_why.py` measures whether `why` **answers**, not just whether records bind: it asks about 40 real locations per repository (half of them decision-linked, half random live symbols) and classifies each reply. The results are published in [extraction-recall.md](docs/extraction-recall.md) instead of asserted: gson 40% line-level, express 27%, cobra 12%, flask 12%.
 
+- A sixth measured project, `BurntSushi/ripgrep` (Rust), exercises the sixth parser on real code: 20883 nodes / 121893 edges / 227 records / **28 decisions**, 22 of them bound. Its 121893 edges are the largest graph measured, and 82% of its decisions reach a code line — the highest of the six, because ripgrep writes commit bodies that name what changed. Only the C++ parser now has no measured project behind it.
+- `scripts/summarize_graph.py` prints one graph's languages, decision counts, bound decisions and structural sanity, so a measurement does not have to be retyped into a document by hand.
+
 ## Removed
 
 - Conventional-commit subjects are no longer presented as decisions; they stay queryable as events with `--include-events`.

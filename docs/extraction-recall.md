@@ -36,12 +36,13 @@ state a reason — in which case they are dependency **decisions**.
 |---|---|---|---|---|---|---|
 | sindresorhus/got | 200 | 237 | **36** | 15.2% | 12 | 25 |
 | pallets/flask | 200 | 229 | **54** | 23.6% | 18 | 37 |
-| spf13/cobra | 200 | 217 | **12** | 5.5% | 8 | 4 |
+| spf13/cobra | 200 | 221 | **12** | 5.4% | 9 | 4 |
 | expressjs/express | 200 | 242 | **22** | 9.1% | 14 | 8 |
-| google/gson | 200 | 223 | **29** | 13.0% | 19 | 10 |
-| CodeGraph self | 50 | 81 | **20** | 24.7% | 11 | 15 |
+| google/gson | 200 | 225 | **29** | 12.9% | 17 | 10 |
+| BurntSushi/ripgrep | 200 | 227 | **28** | 12.3% | 14 | 9 |
+| CodeGraph self | 50 | 93 | **34** | 36.6% | 18 | 23 |
 
-The five projects bracket the product's actual range, which is why all of them
+The six projects bracket the product's actual range, which is why all of them
 are here rather than only the flattering one. Express writes free-form commit
 subjects, so 22 of its 242 records carry a rationale — and 17 of those 22 come
 from its own `History.md`, which states reasons in release notes. `got` writes
@@ -51,8 +52,9 @@ state a reason or a rejected alternative. Cobra is the other direction again —
 short Go commit subjects, terse notes — and only 12 of 217. Gson sits in between:
 29 of 223, ten of them read from javadoc comments that explain a design choice.
 None of the five is configured for: the extractor reads what the project already
-writes down. Five projects across TypeScript, JavaScript, Python, Go and Java also
-exercise five of the seven parsers end to end on real code.
+writes down. Six projects across TypeScript, JavaScript, Python, Go, Java and Rust
+also exercise six of the seven parsers end to end on real code — only the C++
+parser has no measured project behind it.
 
 The flask row is also a bug report: before `CHANGES.rst` support existed, the
 same checkout produced **one** decision, because the extractor looked only at
