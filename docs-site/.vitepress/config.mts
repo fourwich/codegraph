@@ -3,7 +3,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
   title: "CodeGraph",
   description: "Decision memory layer for your codebase",
-  base: "/codegraph/",
+  base: "/codegraph/docs/",
   themeConfig: {
     name: "CodeGraph",
     nav: [
