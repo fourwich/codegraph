@@ -56,6 +56,15 @@ A commit subject is not a reason. CodeGraph only shows a decision card when the 
 states a reason or a rejected alternative; everything else is stored as history you can
 ask for explicitly. That is why the numbers below are small.
 
+> **These figures are the ones published on Devpost and are frozen there.** After the
+> submission deadline the page could no longer be edited, and two bugs found while
+> measuring a sixth and seventh project changed the counts: an all-caps C macro was
+> being parsed as a function (fmt reported 416k edges instead of 104k), and the edge
+> table stored one row per call site instead of one per relationship (6-12% of rows
+> were duplicates). [benchmarks.md](benchmarks.md) and
+> [extraction-recall.md](extraction-recall.md) carry the corrected numbers; this
+> section is kept as the record of what the judges saw.
+
 Measured on five real repositories, five languages, no per-repository configuration:
 
     express (JavaScript) : 5920 nodes /  1460 edges / 242 records /  22 decisions
@@ -88,7 +97,7 @@ timeline slider, and a VSCode extension that reads `codegraph why --json`.
 
 Verification
 
-221 tests, over 80% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS ×
+229 tests, over 80% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS ×
 Python 3.10/3.12). Every test count in the README is checked against the run that
 produced it by a script in CI, so a stale number fails the build. The README
 screenshots are

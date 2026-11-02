@@ -73,6 +73,14 @@ class CppParser(BaseParser):
                 name = declarator_name(node, raw)
         else:
             name = decl_name(node, raw)
+        # `TEST(suite, name) { ... }` is a macro invocation with a body. tree-sitter
+        # reports it as a function_definition whose name is the macro, so every
+        # TEST in a file became a node called "TEST" — and since call edges match on
+        # name, those nodes then fanned out to each other. On fmt that turned 1500
+        # nodes into 416k edges. C and C++ write macros in full capitals, so an
+        # all-caps name is a macro, not a function.
+        if kind == "function" and name and name.isupper():
+            kind, name = None, None
         next_parent, next_fn = parent_uid, current_fn
         if kind and name:
             code_node = make_node(

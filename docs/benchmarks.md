@@ -7,12 +7,13 @@ Real-repo attempts first, then a synthetic scale test. Numbers come from
 
 | Project | Clone | Index | Nodes | Edges | Decisions | Notes |
 |---|---|---|---|---|---|---|
-| sindresorhus/got | depth 300 | 200 commits / 74.9s | 19142 | 65878 | **36** (of 237 records) | TypeScript; conventional commits with rationale carry real decisions |
-| pallets/flask | depth 300 | 200 commits / 36.5s | 7546 | 19840 | **54** (of 229 records) | Python; its `CHANGES.rst` only became readable after rst changelog support |
-| spf13/cobra | depth 300 | 200 commits / 37.6s | 5218 | 20989 | **12** (of 221 records) | Go; its `Command` type carries 62 methods, which checks the Go receiver hierarchy on a real repository |
-| google/gson | depth 300 | 200 commits / 37.6s | 8439 | 78211 | **29** (of 225 records) | Java; the largest edge count measured, and javadoc comments carry 10 of its decisions |
-| BurntSushi/ripgrep | depth 300 | 200 commits / 49.2s | 20883 | 121893 | **28** (of 227 records) | Rust; exercises the sixth parser, and its 121893 edges are the largest graph measured |
-| expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 1460 | **22** (of 242 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
+| sindresorhus/got | depth 300 | 200 commits / 74.9s | 19142 | 53716 | **37** (of 237 records) | TypeScript; conventional commits with rationale carry real decisions |
+| pallets/flask | depth 300 | 200 commits / 36.5s | 7546 | 16557 | **54** (of 229 records) | Python; its `CHANGES.rst` only became readable after rst changelog support |
+| spf13/cobra | depth 300 | 200 commits / 37.6s | 5218 | 16259 | **20** (of 221 records) | Go; its `Command` type carries 62 methods, which checks the Go receiver hierarchy on a real repository |
+| google/gson | depth 300 | 200 commits / 37.6s | 8439 | 61905 | **33** (of 225 records) | Java; the largest edge count measured, and javadoc comments carry 10 of its decisions |
+| BurntSushi/ripgrep | depth 300 | 200 commits / 49.2s | 20883 | 90380 | **33** (of 232 records) | Rust; exercises the sixth parser, and its 121893 edges are the largest graph measured |
+| fmtlib/fmt | depth 300 | 200 commits / 51.7s | 24899 | 104335 | **55** (of 248 records) | C++; the first measured project for that parser, and the largest edge count after de-duplication |
+| expressjs/express | depth 200 | 200 commits / ~60s | 5920 | 1124 | **22** (of 242 records) | After the 2026 correctness + precision pass; see [case study](case-study.md) |
 | vitejs/vite | depth 300 | timeout | — | — | — | clone timed out |
 | fastapi/fastapi | depth 120 | timeout | — | — | — | clone timed out |
 
@@ -24,14 +25,16 @@ previously published "17208 nodes / 43380 edges / 14 decisions" came from before
 the decision tier model and before call edges resolved across files, which is why
 the decision count is now 36 rather than 14.
 
-Express numbers from the 2026 pass: **5920 nodes / 1460 edges / 242 records**, of
+Express numbers from the 2026 pass: **5920 nodes / 1124 edges / 242 records**, of
 which **22 are decisions** and 220 are history events. The earlier
 "7027 nodes / 1180 edges / 174 decisions" was measured before duplicate node
 versions and dangling edges were removed, and before commit subjects stopped
 counting as decisions. The edge count then rose to 2409 because call edges had
-been resolving only inside a single file, and fell back to 1460 once a call
+been resolving only inside a single file, and fell to 1460 once a call
 started preferring the callee defined in its own file instead of fanning out to
-every same-named symbol in the repository. The decision count rose from 5 to 22
+every same-named symbol in the repository; the final 1124 comes from collapsing
+identical `(from, to, kind)` rows, which a call site used to duplicate once per
+occurrence. The decision count rose from 5 to 22
 when changelog discovery became case-insensitive: Express ships `History.md`, and
 its release notes state reasons ("because …", "instead of …"), so those lines are
 read instead of ignored.

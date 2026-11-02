@@ -68,3 +68,48 @@ def test_cpp_class_prototype_and_definition_both_named() -> None:
     nodes = CppParser().parse_text("w.cpp", source)
 
     assert [n.name for n in nodes].count("spin") == 2
+
+
+def test_cpp_macro_with_a_body_is_not_a_function() -> None:
+    """`TEST(suite, name) { ... }` is a macro invocation, not a function.
+
+    tree-sitter reports it as a function_definition whose name is the macro. Every
+    TEST in a file then became a node called "TEST", and because call edges match
+    on name those nodes fanned out to each other: on fmt, 1500 nodes produced
+    416k edges. C and C++ write macros in full capitals, so an all-caps name is a
+    macro.
+    """
+    source = (
+        "TEST(args_test, basic) {\n  int x = 1;\n}\n\n"
+        "TEST(args_test, strings) {\n  int y = 2;\n}\n\n"
+        "void real_function() {\n  int z = 3;\n}\n"
+    )
+    nodes = CppParser().parse_text("t.cc", source)
+    names = [n.name for n in nodes]
+
+    assert "TEST" not in names, names
+    assert "real_function" in names
+
+
+def test_cpp_macro_does_not_swallow_the_class_beside_it() -> None:
+    """Dropping a macro must not drop the real symbols in the same file."""
+    source = (
+        "SOME_MACRO(x) {\n  return 1;\n}\n\n"
+        "class Widget {\n public:\n  void spin();\n};\n\n"
+        "void Widget::spin() {}\n"
+    )
+    nodes = CppParser().parse_text("m.cpp", source)
+    names = {n.name for n in nodes}
+
+    assert "SOME_MACRO" not in names
+    assert "Widget" in names
+    assert "spin" in names
+
+
+def test_cpp_uppercase_class_is_still_kept() -> None:
+    """Only functions are filtered; an all-caps class name is legal C++."""
+    source = "class HTTPClient {\n public:\n  void send();\n};\n"
+    nodes = CppParser().parse_text("c.cpp", source)
+
+    assert by_name(nodes, "HTTPClient").kind == "class"
+    assert by_name(nodes, "send").kind == "function"

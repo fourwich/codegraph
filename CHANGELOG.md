@@ -57,6 +57,11 @@
 - A sixth measured project, `BurntSushi/ripgrep` (Rust), exercises the sixth parser on real code: 20883 nodes / 121893 edges / 227 records / **28 decisions**, 22 of them bound. Its 121893 edges are the largest graph measured, and 82% of its decisions reach a code line — the highest of the six, because ripgrep writes commit bodies that name what changed. Only the C++ parser now has no measured project behind it.
 - `scripts/summarize_graph.py` prints one graph's languages, decision counts, bound decisions and structural sanity, so a measurement does not have to be retyped into a document by hand.
 
+- A C macro with a body is no longer parsed as a function. TEST(suite, name) { ... } arrives from tree-sitter as a unction_definition named after the macro, so every TEST in a file became a node called TEST; because call edges match on name, those nodes then fanned out to each other. On mtlib/fmt that turned 1500 nodes into 416k edges. An all-caps name is now treated as a macro, which is the C/C++ convention.
+- The edge table stores one row per (from, to, kind). A call site used to emit one row per occurrence, so a function calling ormat fifty times wrote fifty identical rows: measured across five repositories, 6-12% of edge rows were duplicates, and on fmt one template helper held 1026 rows pointing at 18 targets. Counts drop 8-26% per project (express 1460 -> 1124, gson 78211 -> 61905, ripgrep 121893 -> 90380).
+- A seventh measured project, mtlib/fmt (C++), closes the last unmeasured parser: 24899 nodes / 104335 edges / 248 records / **55 decisions**, 47 of them bound. All seven parsers now have a real repository behind them, so "7 languages" is measured rather than a list of grammars.
+- scripts/measure_all_projects.py prints every project's index-time node count, live symbol count, edge count and decision breakdown in one run, so a table is filled from measurement instead of from memory.
+
 ## Removed
 
 - Conventional-commit subjects are no longer presented as decisions; they stay queryable as events with `--include-events`.

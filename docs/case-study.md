@@ -11,7 +11,7 @@ Express is one of the most widely used Node.js web frameworks. Its Git history s
 - Commits indexed: **200**
 - Files parsed: JavaScript under `lib/`, `examples/`, root
 - Nodes: **5920** node versions
-- Edges: **1460** (both endpoints stored; 537 of the 776 `uses` edges cross a file boundary)
+- Edges: **1124** (both endpoints stored; 537 of the 776 `uses` edges cross a file boundary)
 - Records: **242** = **22 decisions** + **220 history events**
 - Languages: JavaScript (`.js` / `.mjs` / `.cjs`)
 - Index wall time: **~60 s** (includes historical snapshots)
@@ -21,16 +21,18 @@ The node and edge counts both moved during the 2026 correctness pass:
 - **Nodes 7027 → 5920.** The old versioning opened a new node version every time
   a commit touched a file, so a symbol that never changed still got a fresh
   version per commit, and sometimes two simultaneously-live versions.
-- **Edges 1180 → 1460, via 2409.** Three effects in sequence: the old count
-  included edges pointing at node uids that were never stored; the git path then
-  resolved call edges only within the file being parsed, so **no** call into
+- **Edges 1180 → 1460, via 2409, then 1124.** Four effects in sequence: the old
+  count included edges pointing at node uids that were never stored; the git path
+  then resolved call edges only within the file being parsed, so **no** call into
   another file produced an edge; after cross-file resolution was fixed, a call to
   a name defined in several files was linked to *all* of them. Call resolution now
   prefers the callee defined in the caller's own file and only fans out to other
-  files when nothing local matches, which removed 949 false fan-out edges.
+  files when nothing local matches, which removed 949 false fan-out edges. Finally
+  the 1460 still contained rows identical on `(from, to, kind)`, because a call
+  site emitted one row per occurrence; collapsing them leaves **1124**.
 
-The record count also changed meaning. Express has **204 extractable records**;
-only **5 of them state a reason or a rejected alternative**. The rest are commit
+The record count also changed meaning. Express has **242 extractable records**;
+only **22 of them state a reason or a rejected alternative**. The rest are commit
 subjects and release-note lines, kept as `event` records and hidden from `why`
 and `decisions` unless `--include-events` is passed.
 
@@ -155,9 +157,9 @@ choice).
 |---|---|---|---|---|---|
 | Commits indexed | 200 | 200 | 200 | 200 | 200 |
 | Nodes | 5920 | 19142 | 7546 | 5218 | 8439 |
-| Edges | 1460 | 65878 | 19840 | 20989 | 78211 |
-| Records | 242 | 237 | 229 | 217 | 223 |
-| **Decisions** | **22** (9.1%) | **36** (15.2%) | **54** (23.6%) | **12** (5.5%) | **29** (13.0%) |
+| Edges | 1124 | 53716 | 16557 | 16259 | 61905 |
+| Records | 242 | 237 | 229 | 221 | 225 |
+| **Decisions** | **22** (9.1%) | **37** (15.6%) | **54** (23.6%) | **20** (9.0%) | **33** (14.7%) |
 | Index wall time | ~60 s | 75 s | 37 s | 38 s | 38 s |
 
 The difference is the input, not the configuration: `got` writes commit bodies
