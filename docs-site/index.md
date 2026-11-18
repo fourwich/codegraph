@@ -8,7 +8,7 @@ Ask **why is this line here?** and get a decision card — not just a blame line
 
 ## Features
 
-- tree-sitter parsing (Python, TypeScript, Java, Go, Rust, C++)
+- tree-sitter parsing across 7 languages — Python, TypeScript, JavaScript, Java, Go, Rust, C++ (each verified on a real repository)
 - Real Git time travel (`--at`)
 - Decision extraction from commits, ADRs, CHANGELOG
 - SQLite default · local SQLite store
