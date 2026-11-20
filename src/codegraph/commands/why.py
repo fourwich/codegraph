@@ -25,6 +25,7 @@ from codegraph.models import (
 from codegraph.storage import (
     connect,
     db_path_for_root,
+    find_db,
     find_node_at_line,
     query_decisions_for_commit,
     query_decisions_for_dir,
@@ -45,18 +46,38 @@ class LocationError(ValueError):
 
 
 def normalize_user_path(raw: str) -> str:
-    """Normalize a user path, turning an absolute path inside cwd into a relative one.
+    """Normalize a user path, turning an absolute path inside the repo into a relative one.
 
     Editors such as the VS Code extension hand over `doc.uri.fsPath`, which is
     absolute; stored paths are repo-relative.
+
+    The base has to be the repository root, not the current directory: after
+    `find_db` locates a database above cwd, the caller may be anywhere, and an
+    absolute path that is not under cwd would otherwise stay absolute
+    (`D:/repo/src/a.py`), which never matches the stored `src/a.py`.
     """
     path = Path(raw)
-    if path.is_absolute():
-        for base in (Path.cwd(),):
-            try:
-                return path.resolve().relative_to(base.resolve()).as_posix()
-            except ValueError:
-                continue
+    if not path.is_absolute():
+        return normalize_location_path(raw)
+
+    resolved = path.resolve()
+    bases: list[Path] = []
+    # The most reliable base is the database that owns the file being asked
+    # about, found by walking up from the file itself. Falling back to cwd covers
+    # the editor case, where the extension passes an absolute path inside the
+    # workspace the user opened.
+    file_db = find_db(resolved.parent)
+    if file_db is not None:
+        bases.append(file_db.parent.parent)  # <repo>/.codegraph/graph.db -> <repo>
+    cwd_db = find_db()
+    if cwd_db is not None:
+        bases.append(cwd_db.parent.parent)
+    bases.append(Path.cwd())
+    for base in bases:
+        try:
+            return resolved.relative_to(base.resolve()).as_posix()
+        except ValueError:
+            continue
     return normalize_location_path(raw)
 
 
@@ -73,7 +94,13 @@ def parse_location(raw: str) -> tuple[str, int]:
     line_no = int(match.group("line"))
     if line_no < 1:
         raise LocationError(f"Line number must be >= 1, got: {line_no}")
-    return normalize_user_path(match.group("file")), line_no
+
+    raw_file = match.group("file")
+    # Remember the database that owns the *original* path before it becomes a
+    # repo-relative string: `normalize_user_path` strips the absolute prefix, and
+    # after that there is no way to tell which repository the user meant.
+    _remember_db_for(raw_file)
+    return normalize_user_path(raw_file), line_no
 
 
 def _current_stdout_encodes(text: str) -> bool:
@@ -104,9 +131,61 @@ def format_confidence(confidence: float) -> str:
     return f"{stars}  {percent}%"
 
 
+# Database resolved from the location the user actually typed, set by
+# `_remember_db_for` during argument parsing. `None` means "fall back to cwd".
+_QUERY_DB: Path | None = None
+
+
+def _remember_db_for(raw_path: str) -> None:
+    """Record which graph database owns `raw_path`, before it is relativised.
+
+    Needed because a user may run `codegraph index some/repo` and then query an
+    absolute path inside it from an unrelated directory; the database lives in
+    `some/repo`, not in cwd.
+    """
+    global _QUERY_DB
+    _QUERY_DB = None
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        return
+    found = find_db(candidate.parent)
+    if found is not None:
+        _QUERY_DB = found
+
+
+def _resolve_db(root: Path | None = None, file_path: str = "") -> Path:
+    """Locate the graph database for a query.
+
+    Priority order matters for the case that actually breaks: a user runs
+    `codegraph index some/repo` from elsewhere, then asks about a file inside
+    that repo. `index` wrote the database into `some/repo`, so looking only at the
+    current directory reports "no record" for everything.
+
+    1. the database resolved from the location the user typed;
+    2. walk up from the file being asked about — the most reliable clue;
+    3. walk up from cwd;
+    4. fall back to `<cwd>/.codegraph/graph.db`, which is where `index` writes
+       when given no path.
+    """
+    if _QUERY_DB is not None and _QUERY_DB.is_file():
+        return _QUERY_DB
+
+    if file_path:
+        candidate = Path(file_path)
+        if not candidate.is_absolute():
+            candidate = (root or Path.cwd()) / candidate
+        found = find_db(candidate.parent if candidate.suffix else candidate)
+        if found is not None:
+            return found
+
+    base = root or Path.cwd()
+    found = find_db(base)
+    return found if found is not None else db_path_for_root(base)
+
+
 def load_code_node_sqlite(file_path: str, line: int, root: Path | None = None) -> CodeNode | None:
     """Load covering CodeNode from SQLite if an index exists."""
-    db_path = db_path_for_root(root or Path.cwd())
+    db_path = _resolve_db(root, file_path)
     if not db_path.exists():
         return None
     try:
@@ -131,7 +210,7 @@ def load_decisions_sqlite(
     Returns:
         (decisions, level) where level is "line", "file", "commit", or "dir".
     """
-    db_path = db_path_for_root(root or Path.cwd())
+    db_path = _resolve_db(root, file_path)
     rows: list[Decision] = []
     level = "line"
     if db_path.exists():

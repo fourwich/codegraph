@@ -74,6 +74,25 @@ def db_path_for_root(root: Path) -> Path:
     return root / DEFAULT_DB_REL
 
 
+def find_db(start: Path | None = None) -> Path | None:
+    """Walk up from `start` looking for an existing graph database.
+
+    `codegraph index <path>` writes the database inside `<path>`, but every query
+    command used to look only at the current directory. A first-time user who ran
+    `codegraph index some/repo` from their home directory then got "no record" for
+    everything, because the query was reading the wrong place. Git solves the same
+    problem by walking up to the repository root; this does the same.
+
+    Returns the database path, or None when no ancestor has one.
+    """
+    current = (start or Path.cwd()).resolve()
+    for candidate in (current, *current.parents):
+        db = candidate / DEFAULT_DB_REL
+        if db.is_file():
+            return db
+    return None
+
+
 def connect(db_path: Path) -> sqlite3.Connection:
     """Open (and create if needed) the SQLite database."""
     db_path.parent.mkdir(parents=True, exist_ok=True)

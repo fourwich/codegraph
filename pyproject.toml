@@ -60,6 +60,38 @@ build-backend = "hatchling.build"
 packages = ["src/codegraph"]
 artifacts = ["src/codegraph/web/static/**"]
 
+[tool.hatch.build.targets.sdist]
+# Without this list hatchling packs the whole checkout: the sdist came out at
+# 12 MB because it included .review/ (seven cloned repositories), .venv-test/ and
+# the submission preview images — 37.7 MB uncompressed for a package whose wheel
+# is 87 KB. A stranger downloading from PyPI should not pay for local scratch.
+include = [
+    "src/codegraph/**",
+    "tests/**",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
+exclude = [
+    ".review/**",
+    ".venv/**",
+    ".venv-test/**",
+    ".venv_ci_test/**",
+    ".codegraph/**",
+    ".acl-recovery/**",
+    ".mypy_cache/**",
+    ".pytest_cache/**",
+    ".ruff_cache/**",
+    "submission/**",
+    "docs-site/node_modules/**",
+    "docs-site/.vitepress/dist/**",
+    "vscode-extension/node_modules/**",
+    "vscode-extension/out/**",
+    "dist/**",
+    "vendor/**",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
