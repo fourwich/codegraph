@@ -9,7 +9,7 @@ import webbrowser
 import typer
 from rich.console import Console
 
-from codegraph.i18n import help_text
+from codegraph.i18n import help_text, t
 
 console = Console()
 
@@ -39,13 +39,28 @@ def serve_command(
 ) -> None:
     """Start the local Cytoscape web visualizer.
 
+    The web stack (FastAPI, uvicorn) is an optional extra: most users only run
+    `index` and `why`, and installing a server framework for them is dead weight in
+    a `pip install`. The import happens here so the base install stays small, and a
+    missing extra names the command that fixes it instead of raising ImportError.
+
     Args:
         port: HTTP listen port.
         open_browser: Launch a browser tab once the server is listening.
     """
-    import uvicorn
+    try:
+        import uvicorn
 
-    from codegraph.web.app import app
+        from codegraph.web.app import app
+    except ImportError as exc:
+        # The brackets need quoting on most shells, and PowerShell would otherwise
+        # read them as a wildcard pattern.
+        console.print(
+            f"[bold red]{t('serve.missing_extra')}[/]\n"
+            '  pip install codegraphx\\[serve]\n'
+            f"  [dim]{exc}[/]"
+        )
+        raise typer.Exit(code=1) from exc
 
     url = f"http://127.0.0.1:{port}/"
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="info")

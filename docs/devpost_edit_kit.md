@@ -97,7 +97,7 @@ timeline slider, and a VSCode extension that reads `codegraph why --json`.
 
 Verification
 
-287 tests, over 80% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS ×
+291 tests, over 80% coverage, CI green on a 6-job matrix (Ubuntu/Windows/macOS ×
 Python 3.10/3.12). Every test count in the README is checked against the run that
 produced it by a script in CI, so a stale number fails the build. The README
 screenshots are

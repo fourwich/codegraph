@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import sys
@@ -14,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from codegraph.i18n import help_text, t
+from codegraph.i18n import help_text, is_chinese, t
 from codegraph.models import (
     CodeNode,
     Decision,
@@ -37,6 +38,9 @@ from codegraph.storage import (
     query_decisions_for_line_links,
     query_decisions_for_node_lines,
 )
+from codegraph.translate import MACHINE_MARK, Translator
+
+_TRANSLATOR: Translator | None = None
 
 console = Console()
 
@@ -403,14 +407,16 @@ def _load_all_decisions() -> list[Decision]:
 
 def render_code_node_header(node: CodeNode) -> None:
     """Render the hit CodeNode summary at the top of the card."""
-    valid_to = node.valid_to.date().isoformat() if node.valid_to else "current"
+    valid_to = (
+        node.valid_to.date().isoformat() if node.valid_to else t("node.current")
+    )
     panel = Panel(
         Text(
-            f"  kind: {node.kind}    name: {node.name}\n"
-            f"  range: {node.file_path}:{node.line_start}-{node.line_end}\n"
-            f"  language: {node.language}\n"
-            f"  valid: {node.valid_from.date().isoformat()} → {valid_to}\n"
-            f"  commit: {node.commit_sha or 'n/a'}",
+            f"  {t('node.kind')}: {node.kind}    {t('node.name')}: {node.name}\n"
+            f"  {t('node.range')}: {node.file_path}:{node.line_start}-{node.line_end}\n"
+            f"  {t('node.language')}: {node.language}\n"
+            f"  {t('node.valid')}: {node.valid_from.date().isoformat()} → {valid_to}\n"
+            f"  {t('node.commit')}: {node.commit_sha or t('node.na')}",
             style="cyan",
         ),
         title=f"[bold]{t('card.matched_node')}[/]",
@@ -430,6 +436,30 @@ def decision_title(decision: Decision, index: int = 1) -> str:
     return f"Decision #{index}" + (f" · {ref}" if ref else "")
 
 
+def _append_translation(body: Text, original: str) -> None:
+    """Append a machine translation beneath `original`, or nothing.
+
+    The original is the record and stays authoritative. A translation is prefixed and
+    dimmed so a reader can see at a glance that these are not the project's words; when
+    no local model is available nothing is appended, which is the honest outcome.
+    """
+    if not is_chinese() or not original.strip():
+        return
+    translated = _translator().translate(original)
+    if not translated:
+        return
+    body.append(f"  [dim]{MACHINE_MARK}：{translated}[/]\n")
+
+
+def _translator() -> Translator:
+    """Return the process-wide translator, honouring `CODEGRAPH_TRANSLATE_MODEL`."""
+    global _TRANSLATOR
+    if _TRANSLATOR is None:
+        model = os.environ.get("CODEGRAPH_TRANSLATE_MODEL", "qwen2.5:3b").strip()
+        _TRANSLATOR = Translator(model=model or "qwen2.5:3b")
+    return _TRANSLATOR
+
+
 def build_decision_panel(
     decision: Decision, file_path: str, line: int, level: str = "line", index: int = 1
 ) -> Panel:
@@ -438,21 +468,25 @@ def build_decision_panel(
     body.append(f"[{t('card.location')}]\n", style="bold cyan")
     body.append(f"  {file_path}:{line}\n")
     if level in {"file", "commit", "dir"}:
-        body.append(f"  binding: {level}-level decision\n", style="dim")
+        body.append(
+            f"  binding: {t(f'query.{_level_key(level)}')}\n", style="dim"
+        )
     body.append(f"[{t('card.decision')}]\n", style="bold yellow")
     body.append(f"  {decision.content}\n")
+    _append_translation(body, decision.content)
     body.append(f"[{t('card.reason')}]\n", style="bold yellow")
     reason = (decision.reason or "").strip()
     if not reason or reason == decision.content:
-        body.append("  Not recorded\n")
+        body.append(f"  {t('card.not_recorded')}\n")
     else:
         body.append(f"  {reason}\n")
+        _append_translation(body, reason)
     body.append(f"[{t('card.alternatives')}]\n", style="bold yellow")
     if decision.alternatives:
         for item in decision.alternatives:
             body.append(f"  · {item}\n")
     else:
-        body.append("  (none)\n")
+        body.append(f"  {t('card.none')}\n")
     body.append(f"[{t('card.source')}]\n", style="bold yellow")
     body.append(f"  {decision.source.value} · {decision.source_ref}\n")
     body.append(

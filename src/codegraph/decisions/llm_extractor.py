@@ -6,7 +6,10 @@ import json
 import logging
 from datetime import datetime, timezone
 
-import httpx
+try:
+    import httpx
+except ImportError:  # pragma: no cover - the [llm] extra is absent
+    httpx = None  # type: ignore[assignment]
 
 from codegraph.models import Decision, DecisionSource, DecisionStatus
 

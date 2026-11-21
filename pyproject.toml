@@ -25,16 +25,24 @@ dependencies = [
     "tree-sitter-python>=0.23",
     "python-dotenv>=1.0.0",
     "GitPython>=3.1.40",
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.29.0",
     "tree-sitter-java>=0.21.0",
     "tree-sitter-go>=0.21.0",
     "tree-sitter-rust>=0.21.0",
     "tree-sitter-cpp>=0.21.0",
-    "httpx>=0.27.0",
 ]
 
 [project.optional-dependencies]
+# The visualizer. Most users only run `index` and `why`, so the server framework is
+# not part of the base install: it is 6 MB with its transitive dependencies.
+serve = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+]
+# Optional language features: local model extraction (`index --use-llm`) and machine
+# translation of decision text. Both talk to a local Ollama server over HTTP.
+llm = [
+    "httpx>=0.27.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
