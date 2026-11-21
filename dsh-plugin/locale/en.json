@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "CodeGraph",
+    "description": "Ask why a line of code exists and get the decision record behind it — an ADR, a changelog entry, or a commit body that states a reason. Indexes a repository once, then answers per line.",
+    "detail": "docs/DETAIL.md"
+  }
+}

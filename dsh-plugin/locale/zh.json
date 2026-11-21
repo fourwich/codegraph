@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "CodeGraph",
+    "description": "查询某一行代码为什么存在，拿到它背后的决策记录——架构决策、变更日志条目，或写明了理由的提交说明。索引一次仓库，之后按行提问。",
+    "detail": "docs/DETAIL.md"
+  }
+}

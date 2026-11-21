@@ -1,0 +1,6 @@
+- insert:
+    - id: dsh-codegraph
+      name: 'dsh-codegraph'
+      config:
+        cliPath: 'D:/CodeGraph/.venv/Scripts/codegraph.exe'
+        timeoutMs: 120000

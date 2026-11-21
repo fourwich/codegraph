@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="CodeGraph">
+  <rect width="64" height="64" rx="14" fill="#0f1519"/>
+  <!-- Three nodes linked downward: a line of code, its commit, its decision. -->
+  <line x1="20" y1="18" x2="44" y2="32" stroke="#4cc2ff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="44" y1="32" x2="20" y2="46" stroke="#3ddc84" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="20" y1="18" x2="20" y2="46" stroke="#8b98a5" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>
+  <circle cx="20" cy="18" r="5.5" fill="#4cc2ff"/>
+  <circle cx="44" cy="32" r="5.5" fill="#ffb020"/>
+  <circle cx="20" cy="46" r="5.5" fill="#3ddc84"/>
+</svg>
