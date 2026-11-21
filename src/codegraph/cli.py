@@ -11,6 +11,7 @@ from codegraph.commands.export import export_command
 from codegraph.commands.graph import graph_command
 from codegraph.commands.index import index_command
 from codegraph.commands.serve import serve_command
+from codegraph.commands.skills import install_skills_command
 from codegraph.commands.why import decisions_command, why_command
 
 app = typer.Typer(
@@ -99,6 +100,13 @@ app.command(
     help="Show decision changes between two versions, e.g. diff 2026-09-23 2026-09-24 --scope src",
     rich_help_panel="Core commands",
 )(diff_command)
+
+
+app.command(
+    name="install-skills",
+    help="Install the `codegraph-why` skill so a coding assistant knows to use it",
+    rich_help_panel="Integrations",
+)(install_skills_command)
 
 if __name__ == "__main__":
     app()

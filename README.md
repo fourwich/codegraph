@@ -1,7 +1,7 @@
 # CodeGraph
 
 [![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
-![tests](https://img.shields.io/badge/tests-239%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-250%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -16,7 +16,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 239 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 250 tests
 
 > **Note on the Devpost numbers.** The hackathon entry was submitted before two
 > bugs were found while measuring a sixth and seventh project, and the page was
@@ -68,7 +68,7 @@ codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
 ```
 
-Working on the code itself? `pip install -e ".[dev]"` and `pytest -q` (239 tests,
+Working on the code itself? `pip install -e ".[dev]"` and `pytest -q` (250 tests,
 no network needed).
 
 Then: [the architecture](docs/architecture.md) ·
@@ -78,7 +78,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (239 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (250 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -89,7 +89,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 239 tests passing
+- [x] 250 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
@@ -129,7 +129,7 @@ pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
 pytest -q
 ```
 
-## Commands (8)
+## Commands (9)
 
 ```bash
 codegraph --help
@@ -141,7 +141,30 @@ codegraph diff 2026-09-23 2026-09-24 --scope src
 codegraph conflicts --scope src   # opposite / supersede / temporal
 codegraph export --for-ai --scope src
 codegraph serve --port 8080
+codegraph install-skills [--target dsh|claude|cursor|agents] [--list] [--force]
 ```
+
+### Teaching your assistant to use it
+
+`why` is only useful if the agent remembers to ask. One command installs a skill
+that tells it when:
+
+```bash
+codegraph install-skills
+```
+
+```
+Detected: dsh, claude, agents
+  wrote dsh:    ~/.dsh/skills/codegraph-why/SKILL.md
+  wrote claude: ~/.claude/skills/codegraph-why/SKILL.md
+  wrote agents: ~/.agents/skills/codegraph-why/SKILL.md
+```
+
+The skill is one Markdown file with YAML frontmatter — the format every assistant
+that reads a skills directory understands, so no per-assistant plugin is needed.
+It covers when to reach for `why`, what each `binding` level means, and the one
+instruction that keeps the tool honest: a missing record is an answer, not a
+prompt to invent a plausible reason. `--list` shows the roots without writing.
 
 `why` answers about a code location; a decision that is only bound at file level
 says so, and a location with no decision says so instead of guessing. Add

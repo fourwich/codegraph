@@ -196,15 +196,31 @@ export function apply(ctx, config) {
     ctx.effect(() => {
       const offCreated = ctx.on('agent/created', ({ agent }) => {
         if (!agent?.ctx?.tools || byAgent.has(agent)) return
+        const agentId = agent.id ?? agent.session?.id ?? '(unknown)'
         const disposers = []
         try {
           for (const tool of build()) disposers.push(agent.ctx.tools.register(tool))
         } catch (error) {
-          trace(`agent-register-failed ${error?.code ?? error?.message ?? error}`)
+          trace(`agent-register-failed ${agentId} ${error?.code ?? error?.message ?? error}`)
           return
         }
         byAgent.set(agent, disposers)
-        trace('agent-tools-registered')
+
+        // Record what the registry reports *after* registering, from this agent's
+        // own view. Registering without an error is not the same as being visible:
+        // a restriction or a mis-scoped layer would still hide the tool, and that
+        // difference is invisible from the outside.
+        let visible = '(unavailable)'
+        try {
+          const view = agent.ctx.tools.view?.(agent)
+          if (view?.visible) {
+            visible = [...view.visible.keys()].filter((name) => name.startsWith('codegraph_')).join(',')
+              || '(none)'
+          }
+        } catch (error) {
+          visible = `(view threw: ${error?.message ?? error})`
+        }
+        trace(`agent-tools-registered id=${agentId} visible=${visible}`)
       })
 
       const offDisposed = ctx.on('agent/disposed', ({ agent }) => {
