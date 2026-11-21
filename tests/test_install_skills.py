@@ -43,9 +43,26 @@ def test_skill_body_names_every_binding_level() -> None:
 
 def test_roots_cover_the_published_conventions() -> None:
     roots = skill_roots()
-    assert set(roots) == {"dsh", "claude", "cursor", "agents"}
+    assert set(roots) == {"dsh", "project", "claude", "cursor", "agents"}
     for root in roots.values():
         assert root.name == "skills"
+    # The project root is relative to the working directory, not the home.
+    assert roots["project"] == Path.cwd() / ".dsh" / "skills"
+
+
+def test_committed_skill_matches_the_package_constant() -> None:
+    """The checked-in copy must be exactly what `install-skills` writes.
+
+    Two copies exist on purpose: the package constant is what a `pip install`
+    produces, and the committed file is what a clone carries. They drift silently
+    if nothing compares them, so this fails the build instead.
+    """
+    committed = Path(__file__).resolve().parent.parent / ".dsh" / "skills" / SKILL_NAME / "SKILL.md"
+    assert committed.is_file(), f"missing committed skill at {committed}"
+    assert committed.read_text(encoding="utf-8") == SKILL_FILE, (
+        "the committed skill differs from SKILL_FILE; regenerate with "
+        "`codegraph install-skills --target project --force`"
+    )
 
 
 def test_install_writes_only_the_requested_target(tmp_path, monkeypatch) -> None:

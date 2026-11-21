@@ -1,14 +1,14 @@
 {
   "name": "dsh-codegraph",
   "version": "1.1.0",
-  "private": true,
   "description": "Ask why a line of code exists, from the repository's own decision records. Adds codegraph_why / codegraph_index tools and a /why composer entry.",
   "type": "module",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
   },
   "files": [
     "index.js",
@@ -23,13 +23,7 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-chat",
-        "@deepseek-ai/dsh-client-ui-context-menu",
-        "@deepseek-ai/dsh-client-ui-input-trigger",
-        "@deepseek-ai/dsh-client-locale"
-      ]
+      "platform": "web"
     }
   },
   "peerDependencies": {

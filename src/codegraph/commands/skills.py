@@ -154,6 +154,11 @@ def skill_roots() -> dict[str, Path]:
     return {
         # DeepSeek Harness: user-level root, applies to every project.
         "dsh": _dsh_home() / "skills",
+        # DeepSeek Harness: project-level root, committed with the repository so a
+        # clone carries the skill with no install step. This is also the copy the
+        # test suite compares against the constant below, which keeps the
+        # committed file from drifting away from what `install-skills` writes.
+        "project": Path.cwd() / ".dsh" / "skills",
         # Claude Code reads ~/.claude/skills.
         "claude": home / ".claude" / "skills",
         # Cursor reads ~/.cursor/rules for project rules; skills live beside them.

@@ -1,6 +1,9 @@
 ---
 name: codegraph-why
-description: Explain why a line of code exists, from the repository's own decision records (ADRs, changelogs, commit messages). Use before changing unfamiliar code, or when asked why something is written a certain way.
+description: >-
+  Explain why a line of code exists, from the repository's own decision records
+  (ADRs, changelogs, commit messages). Use before changing unfamiliar code, or
+  when asked why something is written a certain way.
 ---
 
 # codegraph-why
@@ -13,7 +16,7 @@ wrote down, instead of guessing from the code.
 - Before editing code you did not write.
 - When a value or structure looks arbitrary (`retryLimit = 3`, a 200ms timeout, an
   unusual ordering).
-- When the user asks "why does this do X" about code, rather than "what does this do".
+- When the user asks "why does this do X" about code, rather than "what does it do".
 
 ## Setup
 
