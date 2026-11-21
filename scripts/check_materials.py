@@ -36,7 +36,49 @@ CLAIM_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
         re.compile(r"(?<![\w.])(\d+)%\s*coverage", re.IGNORECASE),
         re.compile(r"coverage\s*(\d+)%", re.IGNORECASE),
     ),
+    # The CLI's own surface. `install-skills` shipped without updating four documents, so
+    # a reader could check the front page against `codegraph --help` and find them wrong.
+    "commands": (
+        re.compile(r"(?<![\w.])(\d+)\s+(?:CLI\s+)?commands?\b", re.IGNORECASE),
+    ),
 }
+
+
+def actual_command_count() -> int:
+    """Return how many commands the CLI registers.
+
+    Typer builds the help table at runtime, so the count comes from invoking it rather
+    than from a hardcoded list that could drift the same way the documents did.
+    """
+    import subprocess
+
+    exe = ROOT / ".venv" / "Scripts" / "codegraph.exe"
+    if not exe.is_file():
+        exe = ROOT / ".venv" / "bin" / "codegraph"
+    known = {
+        "index",
+        "why",
+        "decisions",
+        "conflicts",
+        "graph",
+        "diff",
+        "serve",
+        "export",
+        "install-skills",
+    }
+    try:
+        result = subprocess.run(
+            [str(exe), "--help"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    found = {name for name in known if name in (result.stdout or "")}
+    return len(found)
 
 
 def material_files() -> list[Path]:
@@ -162,6 +204,7 @@ def main() -> int:
     expected = {
         "tests": collected_test_count(),
         "coverage": coverage_percent(),
+        "commands": actual_command_count(),
     }
     stale: list[tuple[Path, int, str]] = []
 

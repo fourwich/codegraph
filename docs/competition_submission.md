@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/fourwich/codegraph  
 Live demo: https://fourwich.github.io/codegraph  
-Verified locally: **295 tests passing** · **8 CLI commands** · **7 languages**
+Verified locally: **295 tests passing** · **9 CLI commands** · **7 languages**
 
 ---
 
@@ -167,4 +167,4 @@ I would define the versioned-node schema on day one, and add `--json` earlier so
 Possible wedges: enterprise onboarding, refactoring safety, or AI-agent context packs. For now it is MIT open source; no revenue claims.
 
 **11. Why build this at 15?**  
-I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (295 tests, 8 commands, 7 languages).
+I needed the tool myself and could not ask a staff engineer “why is this line here?” Building it taught parsing, graphs, APIs, and shipping under an honest scoreboard (295 tests, 9 commands, 7 languages).

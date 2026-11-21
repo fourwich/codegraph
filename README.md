@@ -16,7 +16,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 295 tests
+**Status:** alpha · 9 CLI commands · 7 languages · SQLite storage · 295 tests
 
 > **Note on the Devpost numbers.** The hackathon entry was submitted before two
 > bugs were found while measuring a sixth and seventh project, and the page was
@@ -83,7 +83,7 @@ Verified with `pytest -q` and `codegraph --help` (295 tests passing, over 80% co
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
 - [x] Product site (HTML / CSS / JS)
-- [x] CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`)
+- [x] CLI with 9 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff` / `install-skills`)
 - [x] tree-sitter parsing (7 languages)
 - [x] SQLite storage
 - [x] Real Git history traversal
@@ -120,8 +120,8 @@ Requires Python 3.10+. Nothing else: no Docker, no database server, no API key.
 The first `index` takes a few seconds per hundred commits; everything is stored in
 `.codegraph/graph.db` inside the repository you indexed.
 
-The base install pulls 23 packages (about 20 MB). Two features are optional extras,
-because most users never touch them:
+The base install pulls 26 packages. Two features are optional extras, because most users
+never touch them:
 
 ```bash
 pip install "codegraphx[serve]"   # codegraph serve — the web visualizer (+14 MB)

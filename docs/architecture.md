@@ -139,7 +139,7 @@ Numbers below match a local run of `pytest -q` and `codegraph --help` on the sam
 | Status | Item |
 |---|---|
 | ✅ Done | Product site (HTML / CSS / JS) |
-| ✅ Done | CLI with 8 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff`) |
+| ✅ Done | CLI with 9 commands (`index` / `why` / `graph` / `decisions` / `conflicts` / `export` / `serve` / `diff` / `install-skills`) |
 | ✅ Done | tree-sitter parsing for TypeScript, JavaScript, Python, Java, Go, Rust, C++ |
 | ✅ Done | SQLite storage |
 | ✅ Done | Real Git history traversal |
