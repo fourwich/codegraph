@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from codegraph.i18n import help_text
 from codegraph.models import Decision, normalize_location_path, select_decisions
 from codegraph.storage import (
     connect,
@@ -98,18 +99,18 @@ def export_command(
     for_ai: bool = typer.Option(
         False,
         "--for-ai",
-        help="Write an AI-agent context pack",
+        help=help_text("Write an AI-agent context pack", "写出给 AI 代理读的上下文包"),
     ),
     scope: str = typer.Option(
         ".",
         "--scope",
-        help="Path scope, e.g. src or src/auth",
+        help=help_text("Path scope, e.g. src or src/auth", "路径范围，例如 src 或 src/auth"),
         metavar="PATH",
     ),
     output: Path = typer.Option(
         Path(".codegraph/context.md"),
         "--output",
-        help="Output markdown path",
+        help=help_text("Output markdown path", "输出的 markdown 路径"),
         metavar="PATH",
     ),
 ) -> None:

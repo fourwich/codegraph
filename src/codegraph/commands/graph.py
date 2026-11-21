@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from codegraph.i18n import help_text
 from codegraph.models import CodeNode, Decision, decision_to_dict, select_decisions
 from codegraph.storage import (
     connect,
@@ -141,17 +142,22 @@ def build_graph_table(
 
 
 def graph_command(
-    at: str = typer.Option(..., "--at", help="Snapshot date, format YYYY-MM-DD", metavar="DATE"),
+    at: str = typer.Option(
+        ...,
+        "--at",
+        help=help_text("Snapshot date, format YYYY-MM-DD", "快照日期，格式 YYYY-MM-DD"),
+        metavar="DATE",
+    ),
     scope: str = typer.Option(
         ".",
         "--scope",
-        help="Path scope, e.g. src or src/auth",
+        help=help_text("Path scope, e.g. src or src/auth", "路径范围，例如 src 或 src/auth"),
         metavar="PATH",
     ),
     as_json: bool = typer.Option(
         False,
         "--json",
-        help="Emit machine-readable JSON instead of a table",
+        help=help_text("Emit machine-readable JSON instead of a table", "输出 JSON 而非表格"),
     ),
 ) -> None:
     """Print a code-graph snapshot for a historical date and scope.

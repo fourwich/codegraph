@@ -393,6 +393,41 @@ def find_node_at_line(
     return _row_to_node(rows[0])
 
 
+def find_nodes_by_name(
+    conn: sqlite3.Connection,
+    name: str,
+    *,
+    limit: int = 10,
+) -> list[CodeNode]:
+    """Return the innermost live CodeNode versions whose name equals ``name``.
+
+    `why` requires `path:line`, but a caller usually knows the symbol, not the line.
+    This resolves a name to its candidates so the caller can pick one. Several match
+    when the same name exists in more than one file, or as a method on more than one
+    class; the innermost is first, matching what `find_node_at_line` would return.
+
+    Matching is exact and case-sensitive: a partial or fuzzy match would return the
+    wrong symbol, and the caller cannot tell the difference from the card alone.
+
+    Args:
+        conn: Open SQLite connection.
+        name: Exact symbol name.
+        limit: Maximum candidates to return.
+
+    Returns:
+        Live versions of that name, most specific first. Empty when nothing matches.
+    """
+    rows = conn.execute(
+        "SELECT uid, kind, name, file_path, line_start, line_end, language, parent_uid, "
+        "valid_from, valid_to, commit_sha "
+        "FROM nodes WHERE name = ? AND (valid_to IS NULL OR valid_to >= ?) "
+        "ORDER BY file_path, (line_end - line_start) ASC, valid_from DESC "
+        "LIMIT ?",
+        (name, datetime.now(timezone.utc).isoformat(), limit),
+    ).fetchall()
+    return [_row_to_node(row) for row in rows]
+
+
 def query_nodes_at(conn: sqlite3.Connection, at: datetime, scope: str) -> list[CodeNode]:
     """Return nodes valid at a timestamp, filtered by file_path prefix."""
     prefix = (scope or "").replace("\\", "/").rstrip("/")

@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from codegraph.git.refs import RefError, resolve_ref
+from codegraph.i18n import help_text
 from codegraph.models import Decision, DecisionChange, select_decisions
 from codegraph.storage import connect, db_path_for_root, query_decisions_at
 
@@ -138,9 +139,20 @@ def render_json(changes: list[DecisionChange]) -> None:
 
 
 def diff_command(
-    from_ref: str = typer.Argument(..., help="Start version (tag / sha / YYYY-MM-DD)"),
-    to_ref: str = typer.Argument(..., help="End version (tag / sha / YYYY-MM-DD)"),
-    scope: str = typer.Option(".", "--scope", help="Path prefix scope", metavar="PATH"),
+    from_ref: str = typer.Argument(
+        ...,
+        help=help_text("Start version (tag / sha / YYYY-MM-DD)", "起始版本（tag/sha/日期）"),
+    ),
+    to_ref: str = typer.Argument(
+        ...,
+        help=help_text("End version (tag / sha / YYYY-MM-DD)", "结束版本（tag/sha/日期）"),
+    ),
+    scope: str = typer.Option(
+        ".",
+        "--scope",
+        help=help_text("Path prefix scope", "路径前缀范围"),
+        metavar="PATH",
+    ),
     format: str = typer.Option("table", "--format", help="table | json", metavar="FMT"),
 ) -> None:
     """Show decision changes between two versions."""

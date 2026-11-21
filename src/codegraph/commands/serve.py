@@ -9,6 +9,8 @@ import webbrowser
 import typer
 from rich.console import Console
 
+from codegraph.i18n import help_text
+
 console = Console()
 
 READY_TIMEOUT_SECONDS = 5.0
@@ -32,7 +34,7 @@ def serve_command(
     open_browser: bool = typer.Option(
         True,
         "--open-browser/--no-open-browser",
-        help="Open the UI in the default browser",
+        help=help_text("Open the UI in the default browser", "用默认浏览器打开界面"),
     ),
 ) -> None:
     """Start the local Cytoscape web visualizer.
@@ -56,7 +58,7 @@ def serve_command(
     server.run()
 
 
-app = typer.Typer(help="Start the local web visualizer")
+app = typer.Typer(help=help_text("Start the local web visualizer", "启动本地网页可视化"))
 
 if __name__ == "__main__":
     app()

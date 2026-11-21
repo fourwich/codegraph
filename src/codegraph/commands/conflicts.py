@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from codegraph.decisions.conflicts import detect_all
+from codegraph.i18n import help_text
 from codegraph.models import (
     Conflict,
     Decision,
@@ -132,8 +133,18 @@ def render_json(conflicts: list[Conflict], scope: str) -> None:
 
 
 def conflicts_command(
-    scope: str = typer.Option(".", "--scope", help="Path scope, e.g. docs/adr", metavar="PATH"),
-    format: str = typer.Option("table", "--format", help="table | json", metavar="FMT"),
+    scope: str = typer.Option(
+        ".",
+        "--scope",
+        help=help_text("Path scope, e.g. docs/adr", "路径范围，例如 docs/adr"),
+        metavar="PATH",
+    ),
+    format: str = typer.Option(
+        "table",
+        "--format",
+        help=help_text("table | json", "table | json"),
+        metavar="FMT",
+    ),
 ) -> None:
     """Detect contradictory accepted decisions in a scope."""
     if format not in {"table", "json"}:

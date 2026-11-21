@@ -7,205 +7,118 @@ window.__ModuleLoader__.load({
 
     const react = require(`react`);
 
+    /** The question the button puts on the clipboard. */
+    function whyQuestion(code) {
+      const text = typeof code === `string` ? code : ``;
+      const lines = text === `` ? 0 : text.split(`\n`).length;
+      const subject = lines > 1 ? `block of code` : `line`;
+      const body = text === `` ? `` : `\n\n\`\`\`\n${text}\n\`\`\`\n`;
+      return (
+        `Why is this ${subject} written this way?`
+        + `${body}\nUse codegraph_why with the path:line, and show the decision card.`
+      );
+    }
+
     /**
-     * Menu kind this plugin owns.
+     * Wrap a rendered code fence with a copy-the-question button.
      *
-     * DSH defines no `code` or `selection` menu kind, so a wrapper and its rows have
-     * to agree on one. The registry publishes a kind automatically when the first
-     * provider registers for it, so nothing else needs declaring.
-     */
-    const MENU_KIND = `codegraph-code`;
-
-    /** Inserted by the slash entry; the user replaces the placeholder line. */
-    const SLASH_TEMPLATE = `Why is this line written this way? path/to/file.py:42`;
-
-    /**
-     * Wrap a rendered code fence so right-clicking offers an "ask why" row.
+     * A `kind: 'hoc'` contribution is an ordinary component: the renderer calls it
+     * with the default renderer in `children`, so this wraps that child rather than
+     * re-implementing the fence.
      *
-     * The fence slot is `kind: 'hoc'`: a contribution receives the default renderer
-     * as `children` and returns a component that renders it. Wrapping rather than
-     * re-implementing keeps syntax highlighting and streaming behaviour intact.
+     * The button copies instead of sending because DSH publishes no way to write into
+     * the composer from a slot — the `setDraft` occurrences inside other plugins are
+     * their own React state, not a service. Copy plus a clear prompt is the honest
+     * ceiling for this surface.
      */
-    function CodeFenceWithWhy(props) {
-      const { code, lang, children, useContextMenu } = props;
+    function CodeFenceLayer(props) {
+      const { code, children } = props;
+      const [notice, setNotice] = react.useState(null);
+      const [hover, setHover] = react.useState(false);
 
-      // The trigger captures this object; a memo keeps its identity stable across
-      // renders so the menu target does not change every frame.
-      const target = react.useMemo(
-        () => ({
-          kind: MENU_KIND,
-          value: {
-            code: typeof code === `string` ? code : ``,
-            lang: typeof lang === `string` ? lang : ``,
-          },
-        }),
-        [code, lang],
+      const onClick = react.useCallback(
+        async event => {
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(whyQuestion(code));
+            setNotice(`已复制 — 粘贴到输入框发送`);
+          } catch {
+            setNotice(`复制失败 — 手动选中代码 Ctrl+C`);
+          }
+          setTimeout(() => setNotice(null), 4000);
+        },
+        [code],
       );
 
-      // Outside a context-menu host the fence must still render untouched.
-      if (typeof useContextMenu !== `function`) return children ?? null;
-      const bindings = useContextMenu();
-      if (bindings === undefined || bindings === null) return children ?? null;
-
-      const triggerProps = bindings.getTriggerProps(target);
-      return react.createElement(`div`, triggerProps, children);
+      return react.createElement(
+        `div`,
+        {
+          style: {
+            display: `flex`,
+            flexDirection: `column`,
+            alignItems: `flex-start`,
+            gap: `4px`,
+          },
+        },
+        react.createElement(
+          `button`,
+          {
+            type: `button`,
+            title: `复制「为什么这样写」的提问`,
+            onClick,
+            onMouseEnter: () => setHover(true),
+            onMouseLeave: () => setHover(false),
+            style: {
+              padding: `2px 10px`,
+              fontSize: `11px`,
+              lineHeight: `18px`,
+              borderRadius: `4px`,
+              border: `1px solid var(--dsw-alias-border-l2, #d0d0d0)`,
+              background: hover
+                ? `var(--dsw-alias-interactive-bg-hover, #f0f0f0)`
+                : `var(--dsw-alias-bg-module-platform, #ffffff)`,
+              color: `var(--dsw-alias-label-secondary, #555555)`,
+              cursor: `pointer`,
+              transition: `background 120ms`,
+              fontFamily: `inherit`,
+            },
+          },
+          notice ?? `Why?`,
+        ),
+        children,
+      );
     }
 
-    /** Turn the default fence renderer into the wrapped one. */
-    function fenceHoc(Render) {
-      return function WrappedFence(props) {
-        return react.createElement(
-          CodeFenceWithWhy,
-          props,
-          react.createElement(Render, props),
-        );
-      };
-    }
+    /** Slot name the chat view declares for code fences. */
+    const SLOT = `conversation.chat.markdown.fence`;
 
     /**
-     * One menu row for every code fence.
+     * Register the fence layer.
      *
-     * `resolve` runs when a menu opens for a fence; the row's `run` receives the
-     * captured target, which carries the fence text.
-     */
-    function whyMenuProvider() {
-      return {
-        id: `codegraph.why`,
-        target: MENU_KIND,
-        order: 100,
-        async resolve(target, signal) {
-          if (signal?.aborted) return [];
-          const code = target?.value?.code ?? ``;
-          const lang = target?.value?.lang ?? ``;
-          const lines = code === `` ? 0 : code.split(`\n`).length;
-          return [
-            {
-              id: `ask-why`,
-              label: `Ask why this code is written this way`,
-              // An empty fence has nothing to ask about; disable rather than fail
-              // after the click.
-              disabled: lines === 0,
-              run: async () => {
-                const note =
-                  lines === 0
-                    ? `Why is this code written this way?`
-                    : `Why is this ${lang || `code`} written this way? (${lines} line${lines === 1 ? `` : `s`})`;
-                try {
-                  await navigator.clipboard?.writeText?.(note);
-                } catch {
-                  // Clipboard permission is optional; the row still closes.
-                }
-              },
-            },
-          ];
-        },
-      };
-    }
-
-    /** Slash source that inserts a location template. */
-    function buildWhySource() {
-      return {
-        trigger: `/`,
-        name: `why`,
-        order: 5,
-
-        async candidates(_session, { query, signal }) {
-          if (signal?.aborted) return [];
-          const needle = String(query ?? ``).trim().toLowerCase();
-          if (needle.length > 0 && !`why`.startsWith(needle)) return [];
-          return [
-            {
-              name: `why`,
-              description: `Ask why a line of code exists, from the repository's own decision records`,
-              value: `/why`,
-            },
-          ];
-        },
-
-        onPick({ candidate }) {
-          return {
-            insert: {
-              source: `why`,
-              ref: candidate?.value ?? `/why`,
-              label: `/why`,
-              appearance: `file`,
-              clipboardText: SLASH_TEMPLATE,
-            },
-          };
-        },
-
-        codec: {
-          clipboardText: () => SLASH_TEMPLATE,
-          serialize: ref => Promise.resolve(ref),
-        },
-      };
-    }
-
-    /**
-     * Install both contributions.
-     *
-     * Every step degrades independently: a deployment with slots but no context menu
-     * still gets the slash entry, and one with neither still renders fences.
+     * `inject` declares `slots` because cordis refuses a service read that was not
+     * declared — the failure is a silent `cannot get property "slots" without inject`
+     * that leaves the fiber inactive and `apply` never running.
      */
     function apply(ctx) {
-      // A DOM marker is the only observable channel the renderer offers: a browser
-      // module has no filesystem. Reading `document.documentElement.dataset.codegraph`
-      // in DevTools answers "did the client bundle load and run" without guessing.
-      try {
-        if (typeof document !== `undefined`) {
-          document.documentElement.dataset.codegraph = `applied`;
-          const services = [`slots`, `contextMenus`, `inputTriggers`].filter(name => {
-            const value = typeof ctx.get === `function` ? ctx.get(name) : undefined;
-            return value !== undefined && value !== null;
-          });
-          document.documentElement.dataset.codegraphServices = services.join(`,`);
+      if (ctx.slots === undefined) return;
+
+      ctx.slots.inject(SLOT, () => {
+        try {
+          return ctx.slots.register(
+            { name: SLOT, id: `codegraph.why-fence`, order: 1000 },
+            CodeFenceLayer,
+          );
+        } catch {
+          return () => {};
         }
-      } catch {
-        // A missing document means a non-browser host; nothing to mark.
-      }
-
-      const get = typeof ctx.get === `function` ? ctx.get.bind(ctx) : () => undefined;
-      const effect = typeof ctx.effect === `function` ? ctx.effect.bind(ctx) : fn => fn();
-
-      if (ctx.slots !== undefined) {
-        ctx.slots.inject?.(`conversation.chat.markdown.fence`, () =>
-          ctx.slots.register(
-            {
-              name: `conversation.chat.markdown.fence`,
-              id: `codegraph.why-fence`,
-              // Above the built-in math/diff/patch layers, which key on a language.
-              order: 1000,
-            },
-            fenceHoc,
-          ),
-        );
-      }
-
-      const menus = get(`contextMenus`);
-      if (menus !== undefined && menus !== null) {
-        effect(() => menus.register(whyMenuProvider()), `codegraph: fence menu`);
-      }
-
-      const inputTriggers = get(`inputTriggers`);
-      if (inputTriggers !== undefined && inputTriggers !== null) {
-        effect(() => {
-          const unregister = inputTriggers.registerSource(buildWhySource());
-          return () => {
-            unregister();
-          };
-        }, `codegraph: /why source`);
-      }
+      });
     }
 
-    const inject = [
-      `@deepseek-ai/dsh-client-ui-chat`,
-      `@deepseek-ai/dsh-client-ui-context-menu`,
-      `@deepseek-ai/dsh-client-ui-input-trigger`,
-      `@deepseek-ai/dsh-client-locale`,
-    ];
+    const inject = [`slots`];
 
-    exports.apply = apply;
-    exports.inject = inject;
+    module.exports.apply = apply;
+    module.exports.inject = inject;
     return module.exports;
   },
 });

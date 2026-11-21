@@ -14,6 +14,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from codegraph.i18n import help_text, t
 from codegraph.models import (
     CodeNode,
     Decision,
@@ -27,6 +28,7 @@ from codegraph.storage import (
     db_path_for_root,
     find_db,
     find_node_at_line,
+    find_nodes_by_name,
     query_decisions_for_commit,
     query_decisions_for_dir,
     query_decisions_for_file,
@@ -81,16 +83,42 @@ def normalize_user_path(raw: str) -> str:
     return normalize_location_path(raw)
 
 
-def parse_location(raw: str) -> tuple[str, int]:
-    """Parse `file:line` into (path, line)."""
+def parse_location(raw: str, root: Path | None = None) -> tuple[str, int]:
+    """Parse `file:line`, or resolve a bare symbol name to its first definition.
+
+    `path:line` remains the precise form. A caller that knows only the symbol — which
+    is the common case when reading unfamiliar code, or when an agent is told "explain
+    `insert_nodes`" — gets the innermost live definition instead of an error. Several
+    symbols can share a name; the first candidate is used and its location is echoed,
+    so the caller can see which one was chosen.
+
+    Args:
+        raw: Either `path:line`, or an exact symbol name.
+        root: Repository root for a symbol lookup; defaults to the current directory.
+
+    Returns:
+        A repo-relative path and a 1-based line inside the matching symbol.
+
+    Raises:
+        LocationError: when the value is empty, malformed, or names nothing indexed.
+    """
     value = raw.strip()
     if not value:
         raise LocationError("Location cannot be empty. Use the form src/main.py:42")
+
     match = LOCATION_RE.match(value)
     if not match:
+        resolved = _resolve_symbol(value, root)
+        if resolved is not None:
+            return resolved
+        hint = _near_miss_hint(value)
         raise LocationError(
-            f"Cannot parse location '{raw}'. Expected path:line, e.g. src/main.py:42"
+            f"Cannot parse location '{raw}'. Expected path:line (src/main.py:42) "
+            "or an indexed symbol name."
+            + (f" Did you mean: {hint}?" if hint else "")
+            + " Run `codegraph index .` first if the repository has no graph yet."
         )
+
     line_no = int(match.group("line"))
     if line_no < 1:
         raise LocationError(f"Line number must be >= 1, got: {line_no}")
@@ -103,6 +131,84 @@ def parse_location(raw: str) -> tuple[str, int]:
     return normalize_user_path(raw_file), line_no
 
 
+def _near_miss_hint(name: str, limit: int = 3) -> str:
+    """Return up to `limit` indexed symbol names close to `name`, or an empty string.
+
+    A substring match in either direction covers both mistakes that matter: a
+    truncated name (`insert` for `insert_nodes`) and an over-qualified one
+    (`storage.insert_nodes`). Case-insensitive, because the caller typed it from
+    memory rather than from a listing.
+    """
+    db_path = _resolve_db(Path.cwd(), name)
+    if not db_path.is_file():
+        return ""
+    needle = name.rsplit(".", 1)[-1].strip().lower()
+    if len(needle) < 3:
+        return ""
+    try:
+        conn = connect(db_path)
+    except sqlite3.Error:
+        return ""
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT name FROM nodes WHERE (valid_to IS NULL OR valid_to >= ?) "
+            "AND (lower(name) LIKE ? OR ? LIKE '%' || lower(name) || '%') "
+            "AND length(name) >= 3 "
+            # A name the query starts with is what the caller meant; a name that merely
+            # contains the query is a weaker guess.
+            "ORDER BY (lower(name) LIKE ?) DESC, abs(length(name) - ?) ASC, name "
+            "LIMIT ?",
+            (
+                datetime.now(timezone.utc).isoformat(),
+                f"%{needle}%",
+                needle,
+                f"{needle}%",
+                len(needle),
+                limit,
+            ),
+        ).fetchall()
+    finally:
+        conn.close()
+    return ", ".join(row[0] for row in rows if row[0])
+
+
+def _resolve_symbol(name: str, root: Path | None = None) -> tuple[str, int] | None:
+    """Turn an exact symbol name into (path, first line), or None when unknown."""
+    # Same resolution as a `path:line` query, so the two forms find the same database
+    # no matter which directory the caller is in.
+    db_path = _resolve_db(root or Path.cwd(), name)
+    if not db_path.is_file():
+        return None
+    try:
+        conn = connect(db_path)
+    except sqlite3.Error:
+        return None
+    try:
+        nodes = find_nodes_by_name(conn, name, limit=1)
+    finally:
+        conn.close()
+    if not nodes:
+        return None
+
+    # A `path:line` query records the owning database before relativising the path; the
+    # symbol branch must do the same, or the later decision lookup reads a different
+    # database and reports no record for a line that has one.
+    global _QUERY_DB
+    _QUERY_DB = db_path
+
+    node = nodes[0]
+    return node.file_path, node.line_start
+
+
+
+def _level_key(level: str) -> str:
+    """Map a `binding` value to its query-summary message key.
+
+    The value itself stays English in JSON; only the sentence that mentions it is
+    translated.
+    """
+    return level if level in {"line", "file", "dir", "commit"} else "line"
+
 def _current_stdout_encodes(text: str) -> bool:
     """True when the active stdout encoding can represent text."""
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
@@ -114,14 +220,33 @@ def _current_stdout_encodes(text: str) -> bool:
 
 
 def format_status_label(status_value: str) -> str:
-    """Map decision status to a short label, degrading to ASCII when needed."""
-    mapping = {
-        "accepted": ("✅ active", "[OK] active"),
-        "superseded": ("🔁 superseded", "[SUPERSEDED]"),
-        "rejected": ("⛔ rejected", "[REJECTED]"),
+    """Map decision status to a short label, degrading to ASCII when needed.
+
+    Three axes vary independently: the status word (translated), the symbol (only when
+    the console can encode it), and the ASCII fallback for consoles that cannot. The
+    status value itself stays English everywhere else, so a script reading JSON sees the
+    same token in every locale.
+    """
+    symbols = {
+        "accepted": "✅",
+        "superseded": "🔁",
+        "rejected": "⛔",
     }
-    preferred, fallback = mapping.get(status_value, (status_value, status_value))
-    return preferred if _current_stdout_encodes(preferred) else fallback
+    keys = {
+        "accepted": "status.active",
+        "superseded": "status.superseded",
+        "rejected": "status.rejected",
+    }
+    key = keys.get(status_value)
+    word = t(key) if key is not None else status_value
+    symbol = symbols.get(status_value, "")
+
+    if symbol and _current_stdout_encodes(f"{symbol} {word}"):
+        return f"{symbol} {word}"
+    if _current_stdout_encodes(word):
+        return word
+    # A console that cannot encode the translation falls back to the English token.
+    return status_value.upper()
 
 
 def format_confidence(confidence: float) -> str:
@@ -288,7 +413,7 @@ def render_code_node_header(node: CodeNode) -> None:
             f"  commit: {node.commit_sha or 'n/a'}",
             style="cyan",
         ),
-        title="[bold]Matched CodeNode[/]",
+        title=f"[bold]{t('card.matched_node')}[/]",
         border_style="cyan",
         padding=(0, 2),
     )
@@ -300,7 +425,7 @@ def decision_title(decision: Decision, index: int = 1) -> str:
     snippet = " ".join((decision.content or "").split())
     if snippet:
         snippet = snippet[:40] + ("…" if len(snippet) > 40 else "")
-        return f"Decision #{index}: {snippet}"
+        return f"{t('card.decision')} #{index}: {snippet}"
     ref = (decision.source_ref or "").split()[-1] if decision.source_ref else ""
     return f"Decision #{index}" + (f" · {ref}" if ref else "")
 
@@ -310,33 +435,33 @@ def build_decision_panel(
 ) -> Panel:
     """Render one decision as a Rich Panel card."""
     body = Text()
-    body.append("[Location]\n", style="bold cyan")
+    body.append(f"[{t('card.location')}]\n", style="bold cyan")
     body.append(f"  {file_path}:{line}\n")
     if level in {"file", "commit", "dir"}:
         body.append(f"  binding: {level}-level decision\n", style="dim")
-    body.append("[Decision]\n", style="bold yellow")
+    body.append(f"[{t('card.decision')}]\n", style="bold yellow")
     body.append(f"  {decision.content}\n")
-    body.append("[Reason]\n", style="bold yellow")
+    body.append(f"[{t('card.reason')}]\n", style="bold yellow")
     reason = (decision.reason or "").strip()
     if not reason or reason == decision.content:
         body.append("  Not recorded\n")
     else:
         body.append(f"  {reason}\n")
-    body.append("[Alternatives]\n", style="bold yellow")
+    body.append(f"[{t('card.alternatives')}]\n", style="bold yellow")
     if decision.alternatives:
         for item in decision.alternatives:
             body.append(f"  · {item}\n")
     else:
         body.append("  (none)\n")
-    body.append("[Source]\n", style="bold yellow")
+    body.append(f"[{t('card.source')}]\n", style="bold yellow")
     body.append(f"  {decision.source.value} · {decision.source_ref}\n")
     body.append(
         f"  author: {decision.author or 'unknown'} · "
         f"date: {decision.timestamp.date().isoformat()}\n"
     )
-    body.append("[Status]\n", style="bold yellow")
+    body.append(f"[{t('card.status')}]\n", style="bold yellow")
     body.append(f"  {format_status_label(decision.status.value)}\n")
-    body.append("[Constraints]\n", style="bold yellow")
+    body.append(f"[{t('card.constraints')}]\n", style="bold yellow")
     if decision.constraints:
         for item in decision.constraints:
             body.append(f"  · {item}\n")
@@ -363,16 +488,12 @@ def render_decision_card(
         decisions: Decisions to show.
         level: Binding strength — line / file / commit / dir / none.
     """
-    labels = {
-        "line": "line-level decision",
-        "file": "file-level decision",
-        "commit": "commit-level decision",
-        "dir": "directory-level decision",
-        "none": "decision",
-    }
-    tag = labels.get(level, "decision")
+    # The sentence is prose, so it is translated; `level` itself stays an English
+    # binding value everywhere else (JSON, the card header).
+    tag = t(f"query.{_level_key(level)}")
     console.print(
-        f"[bold cyan]Query[/] {file_path}:{line} → [bold]{len(decisions)}[/] matched {tag}(s)\n"
+        f"[bold cyan]{t('query.label')}[/] {file_path}:{line} → "
+        f"[bold]{len(decisions)}[/] {tag}\n"
     )
     for i, decision in enumerate(decisions[:5], start=1):
         panel = build_decision_panel(decision, file_path, line, level=level, index=i)
@@ -396,7 +517,7 @@ def render_not_found(
             turns "nothing here" into an answer for files governed by an ADR.
     """
     location = f"{file_path}:{line}" if line is not None else file_path
-    console.print("[bold yellow]No decision record found[/]")
+    console.print(f"[bold yellow]{t('empty.no_decision')}[/]")
     if related:
         console.print("[dim]No record is tied to this line, but this file is governed by:[/]")
         for item in related:
@@ -442,17 +563,28 @@ def why_command(
     as_json: bool = typer.Option(
         False,
         "--json",
-        help="Emit machine-readable JSON instead of Rich cards",
+        help=help_text("Emit machine-readable JSON instead of Rich cards", "输出 JSON 而非卡片"),
     ),
     include_dependency: bool = typer.Option(
         False,
         "--include-dependency",
-        help="Include dependency-bump decisions (hidden by default)",
+        help=help_text("Include dependency bumps (hidden)", "含依赖升级（默认隐藏）"),
     ),
     include_events: bool = typer.Option(
         False,
         "--include-events",
-        help="Include event records (plain history: commit subjects, changelog lines)",
+        help=help_text(
+            "Include event records (plain history: commit subjects, changelog lines)",
+            "包含事件记录（纯历史：提交标题、变更日志行）",
+        ),
+    ),
+    root: str = typer.Option(
+        "",
+        "--root",
+        help=help_text(
+            "Repository root; needed to query a symbol from outside its repo",
+            "仓库根目录；在仓库外按符号查询时指定",
+        ),
     ),
 ) -> None:
     """Query decision cards for a source location.
@@ -464,7 +596,7 @@ def why_command(
     import json as jsonlib
 
     try:
-        file_path, line = parse_location(location)
+        file_path, line = parse_location(location, root=Path(root).resolve() if root else None)
     except LocationError as exc:
         if as_json:
             typer.echo(jsonlib.dumps({"error": str(exc)}))

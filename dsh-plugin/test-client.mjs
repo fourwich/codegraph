@@ -18,6 +18,12 @@ const nodeRequire = createRequire(`${process.env.DSH_PROFILE_DIR}/package.json`)
 const reactStub = {
   createElement: (type, props, ...children) => ({ type, props, children }),
   useMemo: (fn) => fn(),
+  // Hooks are inert here: the test calls the component once to check its output
+  // shape, not to run a render loop.
+  useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
+  useCallback: (fn) => fn,
+  useRef: (initial) => ({ current: initial }),
+  useEffect: () => {},
 }
 
 const LOADED = new Map()
@@ -118,34 +124,15 @@ if (fenceRegs.length !== 1) {
   process.exit(1)
 }
 
-// The hoc must call the wrapped renderer and keep its output.
-const Render = (props) => ({ type: 'pre', text: props.code })
-const Wrapped = fenceRegs[0].component(Render)
-const tree = Wrapped({ code: 'a\nb', lang: 'py', children: null })
-console.log('  wrapped render ->', tree?.type, '| has children:', Boolean(tree?.children))
-
-console.log('\n  menu providers:', menuRegs.length)
-if (menuRegs.length !== 1) {
-  console.error('  FAIL: expected one menu provider')
-  process.exit(1)
-}
-const provider = menuRegs[0]
-console.log('    target:', provider.target)
-console.log('    order :', provider.order)
-
-const rows = await provider.resolve({ value: { code: 'x = 1\ny = 2', lang: 'python' } })
-console.log('    rows  :', JSON.stringify(rows.map((r) => ({ id: r.id, disabled: r.disabled }))))
-if (rows.length !== 1 || rows[0].disabled !== false) {
-  console.error('  FAIL: a non-empty fence must produce one enabled row')
-  process.exit(1)
-}
-
-const emptyRows = await provider.resolve({ value: { code: '', lang: '' } })
-console.log('    empty fence row disabled:', emptyRows[0]?.disabled)
-if (emptyRows[0]?.disabled !== true) {
-  console.error('  FAIL: an empty fence must disable the row')
-  process.exit(1)
-}
+// A kind: 'hoc' contribution is a plain component: the renderer calls it with the
+// default renderer in children. It must wrap that child, not replace it.
+const leaf = { type: 'pre', text: 'a\nb' }
+const tree = fenceRegs[0].component({ code: 'a\nb', lang: 'py', children: leaf })
+console.log('  hoc wrapper type :', tree?.type)
+console.log('  keeps its child  :', Boolean(tree?.children))
+const button = tree?.children?.[0]
+console.log('  button type      :', button?.type)
+console.log('  button label     :', button?.children)
 
 console.log('\n  slash sources:', [...slashSources.keys()].join(', ') || '(none)')
 const why = slashSources.get('/why')

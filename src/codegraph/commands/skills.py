@@ -1,8 +1,8 @@
 """Install the agent skill that teaches `codegraph why` to coding assistants.
 
 The skill is a Markdown file with YAML frontmatter. Every agent that reads a skills
-directory understands that format, and each one uses a different root, so this
-command writes the same file to whichever roots the caller asks for.
+directory understands that format, and each one uses a different root, so this command
+writes the same file to whichever roots the caller asks for.
 
 Nothing here is specific to one assistant: the file content is plain instructions and
 the directory conventions are the published ones.
@@ -20,10 +20,13 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from codegraph.i18n import help_text
+
 console = Console()
 
-# The skill text. Kept as a module constant rather than a data file so the wheel
-# stays a single package and `pip install` is enough to ship it.
+# The skill text. Kept as a module constant rather than a data file so the wheel stays
+# a single package and `pip install` is enough to ship it. `.dsh/skills` in this
+# repository holds the same bytes, and a test compares them so they cannot drift.
 SKILL_NAME = "codegraph-why"
 
 SKILL_BODY = """\
@@ -41,29 +44,51 @@ wrote down, instead of guessing from the code.
 
 ## Setup
 
-The CLI must be installed once:
-
 ```bash
 pip install codegraphx
-```
-
-Then index the repository you are working in. This is the only step that takes
-time (a few seconds per hundred commits):
-
-```bash
 codegraph index . --depth 50
 ```
 
-`--depth` is how far back the git history is read. Deeper finds older decisions and
-takes longer. The database lands in `.codegraph/graph.db` inside the repository.
+`--depth` is how far back the git history is read; deeper finds older decisions and
+takes longer. The database lands in `.codegraph/graph.db`. Run this once per
+repository — `why` reports no record until the repository is indexed.
 
-## Asking why
+## Two ways to ask
+
+**By location** — the precise form:
 
 ```bash
-codegraph why <path>:<line>
+codegraph why src/codegraph/storage.py:200
 ```
 
-Real output:
+**By symbol name** — when you know the function, not the line:
+
+```bash
+codegraph why insert_nodes
+```
+
+The symbol form resolves to the innermost live definition and prints it, so you can
+see which one was chosen. If the name does not exist, the error suggests close
+matches:
+
+```
+Cannot parse location 'insert'. ... Did you mean: insert_edges, insert_nodes, insert_decisions?
+```
+
+Names are matched exactly. A near miss is never silently accepted — a fuzzy match
+would return the wrong symbol and the card alone would not reveal it.
+
+A symbol has no path to carry its repository, so querying one from outside its
+repository needs `--root`:
+
+```bash
+codegraph why make_response --root ../flask
+```
+
+`path:line` does not need it: an absolute path already names the repository, and a
+relative one is resolved by walking up.
+
+## Reading the answer
 
 ```
 ┌──── Matched CodeNode ────────────────────────────────┐
@@ -81,10 +106,6 @@ Query storage.py:200 → 1 matched line-level decision(s)
     [Source]  adr · ADR 001-use-sqlite-default
 ```
 
-Add `--json` for machine-readable output.
-
-## Reading the answer
-
 **`binding`** tells you how the record was matched:
 
 | binding | meaning |
@@ -96,39 +117,57 @@ Add `--json` for machine-readable output.
 | `none` | no record |
 
 **`found: false` is a real answer.** CodeGraph only shows a decision card when the
-record states a reason or a rejected alternative. A project that never wrote down
-its rationale produces no cards — that is the honest result, not a tool failure.
-Say so, rather than inventing a plausible reason.
+record states a reason or a rejected alternative. A project that never wrote down its
+rationale produces no cards — that is the honest result, not a tool failure. Say so,
+rather than inventing a plausible reason.
 
-## Related commands
+## Flags
+
+| flag | effect |
+|---|---|
+| `--json` | machine-readable payload, for scripting or an editor |
+| `--include-events` | also show plain history (commit subjects, changelog lines) |
+| `--include-dependency` | also show dependency-bump decisions |
+
+`--json` returns `{ file, line, node, decisions, binding, related }`. It exits 1 when
+no decision matched, so a script can branch on the code without parsing text.
+
+## Going further
 
 ```bash
-codegraph decisions --file <path> --timeline   # how a file's decisions evolved
-codegraph conflicts --scope <path>             # decisions that contradict each other
-codegraph graph --at 2026-09-28 --scope src    # the code graph as of a past date
+codegraph decisions --file src/storage.py --timeline   # how a file's decisions evolved
+codegraph decisions --timeline                         # the whole repository, oldest first
+codegraph conflicts --scope src                        # decisions that contradict each other
+codegraph graph --at 2026-09-28 --scope src            # the code graph as of a past date
+codegraph export --for-ai --scope src                  # a context pack for a larger review
 ```
+
+`decisions --timeline` is the one to reach for when the question is "how did this file
+get to its current shape" rather than "why does this one line exist".
 
 ## Limits worth stating to the user
 
 - **Coverage is partial.** Measured on seven real repositories, 12–40% of sampled
-  lines returned a line-level card. A changelog entry links to one line, not to
-  every line it influenced.
-- **A root-level file gets no directory fallback.** The root is not a subject area,
-  so `why LICENSE:1` correctly reports no record.
+  lines returned a line-level card. A changelog entry links to one line, not to every
+  line it influenced; the file-level fallback covers part of that gap.
+- **A root-level file gets no directory fallback.** The root is not a subject area, so
+  `why LICENSE:1` correctly reports no record.
 - **A shallow clone carries only recent history**, so older decisions are absent.
 - **Seven languages:** Python, TypeScript, JavaScript, Java, Go, Rust, C++.
+- **Indexing is a prerequisite, not automatic.** An unindexed repository reports no
+  record for everything, which reads like a broken tool rather than a missing step.
 
-When the answer is no record, report that plainly. The value of this tool is that
-it does not fabricate an explanation.
+When the answer is no record, report that plainly. The value of this tool is that it
+does not fabricate an explanation.
 """
 
 SKILL_FILE = f"""\
 ---
 name: {SKILL_NAME}
 description: >-
-  Explain why a line of code exists, from the repository's own decision records
-  (ADRs, changelogs, commit messages). Use before changing unfamiliar code, or
-  when asked why something is written a certain way.
+  Answer "why is this line written this way?" from the repository's own decision
+  records (ADRs, changelogs, commit messages). Use before editing unfamiliar code,
+  or when a value looks arbitrary. Accepts a path:line or a symbol name.
 ---
 
 {SKILL_BODY}"""
@@ -156,14 +195,15 @@ def skill_roots() -> dict[str, Path]:
         "dsh": _dsh_home() / "skills",
         # DeepSeek Harness: project-level root, committed with the repository so a
         # clone carries the skill with no install step. This is also the copy the
-        # test suite compares against the constant below, which keeps the
-        # committed file from drifting away from what `install-skills` writes.
+        # test suite compares against the constant above, which keeps the committed
+        # file from drifting away from what `install-skills` writes.
         "project": Path.cwd() / ".dsh" / "skills",
-        # Claude Code reads ~/.claude/skills.
+        # Claude Code: personal skills.
         "claude": home / ".claude" / "skills",
-        # Cursor reads ~/.cursor/rules for project rules; skills live beside them.
-        "cursor": home / ".cursor" / "skills",
-        # The AGENTS.md convention: ~/.agents/skills, read by several assistants.
+        # Cursor discovers project skills from .cursor/skills. There is no documented
+        # user-level equivalent, so this is the project root, not a home directory.
+        "cursor": Path.cwd() / ".cursor" / "skills",
+        # The shared Agent Skills tree: read by Codex, and by Cursor as well.
         "agents": home / ".agents" / "skills",
     }
 
@@ -173,20 +213,23 @@ def install_skills_command(
         None,
         "--target",
         "-t",
-        help="Root to install into: dsh, claude, cursor, agents. Repeatable. "
+        help="Root to install into: dsh, project, claude, cursor, agents. Repeatable. "
         "Defaults to every root whose parent directory already exists.",
     ),
     list_only: bool = typer.Option(
         False,
         "--list",
         "-l",
-        help="Show the roots and whether a skill is already installed; write nothing.",
+        help=help_text(
+            "Show the roots and whether a skill is already installed; write nothing.",
+            "只显示各目录与安装状态，不写文件。",
+        ),
     ),
     force: bool = typer.Option(
         False,
         "--force",
         "-f",
-        help="Overwrite an existing skill file even if it differs.",
+        help=help_text("Overwrite an existing skill file even if it differs.", "覆盖已有文件"),
     ),
 ) -> None:
     """Install the `codegraph-why` skill so a coding assistant knows to use it."""
@@ -197,7 +240,6 @@ def install_skills_command(
         console.print("[bold]Skill roots[/]")
         for name, root in roots.items():
             installed = (root / SKILL_NAME / "SKILL.md").is_file()
-            # `parent.exists()` is the signal used for the default selection, so show it.
             marker = "[green]installed[/]" if installed else "[dim]not installed[/]"
             exists = "" if root.parent.exists() else " [dim](parent missing)[/]"
             console.print(f"  {name:<8} {root}  {marker}{exists}")
@@ -207,7 +249,15 @@ def install_skills_command(
     if not chosen:
         # Default to roots whose parent exists, so an uninstalled assistant is not
         # given a directory tree it never asked for.
-        chosen = [name for name, root in roots.items() if root.parent.exists()]
+        # A project root is only a sensible default inside a repository, where its
+        # parent is the working directory itself; elsewhere it would write a stray
+        # tree into whatever directory the caller happened to be in.
+        project_roots = {"project", "cursor"}
+        chosen = [
+            name
+            for name, root in roots.items()
+            if (name not in project_roots or root.parent.exists()) and root.parent.exists()
+        ]
         if not chosen:
             console.print(
                 "[yellow]No assistant directory found.[/] "

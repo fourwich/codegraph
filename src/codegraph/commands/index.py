@@ -14,6 +14,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from codegraph.decisions.sources import extract_all
 from codegraph.git.diff import get_changed_lines
 from codegraph.git.history import CommitInfo, GitHistory
+from codegraph.i18n import help_text
 from codegraph.models import (
     CodeNode,
     Decision,
@@ -729,17 +730,24 @@ def run_index_progress(steps: list[str], progress_console: Console | None = None
 
 
 def index_command(
-    path: Path = typer.Argument(..., help="Repository or directory path to index", metavar="PATH"),
+    path: Path = typer.Argument(
+        ...,
+        help=help_text("Repository or directory path to index", "要索引的仓库或目录路径"),
+        metavar="PATH",
+    ),
     depth: int = typer.Option(
         100,
         "--depth",
-        help="How many recent commits to walk (default 100)",
+        help=help_text("How many recent commits to walk (default 100)", "回溯提交数（默认 100）"),
         metavar="N",
     ),
     use_llm: bool = typer.Option(
         False,
         "--use-llm",
-        help="Use local Ollama to extract decisions when rules miss",
+        help=help_text(
+            "Use local Ollama to extract decisions when rules miss",
+            "规则没抽到时用本地 Ollama 补抽决策",
+        ),
     ),
     llm_model: str = typer.Option(
         "llama3.2",

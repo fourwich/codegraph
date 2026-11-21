@@ -1,7 +1,7 @@
 # CodeGraph
 
 [![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
-![tests](https://img.shields.io/badge/tests-251%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-287%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -16,7 +16,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 251 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 287 tests
 
 > **Note on the Devpost numbers.** The hackathon entry was submitted before two
 > bugs were found while measuring a sixth and seventh project, and the page was
@@ -68,7 +68,7 @@ codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
 ```
 
-Working on the code itself? `pip install -e ".[dev]"` and `pytest -q` (251 tests,
+Working on the code itself? `pip install -e ".[dev]"` and `pytest -q` (287 tests,
 no network needed).
 
 Then: [the architecture](docs/architecture.md) ·
@@ -78,7 +78,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (251 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (287 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -89,7 +89,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 251 tests passing
+- [x] 287 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
@@ -166,9 +166,45 @@ It covers when to reach for `why`, what each `binding` level means, and the one
 instruction that keeps the tool honest: a missing record is an answer, not a
 prompt to invent a plausible reason. `--list` shows the roots without writing.
 
+Roots and the convention behind each:
+
+| Target | Path | Read by |
+|---|---|---|
+| `dsh` | `~/.dsh/skills` | DeepSeek Harness (personal) |
+| `project` | `.dsh/skills` | DeepSeek Harness (per repository, committed) |
+| `claude` | `~/.claude/skills` | Claude Code |
+| `cursor` | `.cursor/skills` | Cursor (project only; it also reads `.agents/skills`) |
+| `agents` | `~/.agents/skills` | Codex, and Cursor's shared tree |
+
+### Chinese output
+
+Card labels, table headers, status words, help text, and error messages are translated.
+Two things are deliberately not: command and flag names, and the `binding` tokens
+(`line`, `file`, `commit`, `dir`, `none`) — a script or editor reads those, so they stay
+stable in every locale.
+
+```bash
+CODEGRAPH_LANG=zh codegraph why src/app.py:42
+
+查询 src/app.py:42 → 1 条行级决策
+
+  ┌──────────── 决策 #1: Use SQLite as the store ────────────┐
+  │  [位置]  src/app.py:42                                    │
+  │  [决策]  Use SQLite (stdlib `sqlite3`) as the store.      │
+  │  [理由]  Judges must run the CLI without a database.      │
+  │  [状态]  ✅ 生效中                                         │
+  └───────────────────────────────────────────────────────────┘
+```
+
+Without the variable, `LANG`/`LC_ALL` decide, and failing that the console encoding: a
+`cp936` console gets Chinese, a UTF-8 one keeps English so a shared log stays readable.
+`CODEGRAPH_LANG=en` forces English.
+
 `why` answers about a code location; a decision that is only bound at file level
 says so, and a location with no decision says so instead of guessing. Add
-`--include-events` to see the commit history behind a line.
+`--include-events` to see the commit history behind a line. A bare symbol name works in
+place of `path:line`, and `--root` names the repository when the symbol is queried from
+outside it.
 
 Decisions that have no commit of their own (ADRs, CHANGELOG entries) bind to the
 code they declare, so a design rule is reachable from the line it governs:
