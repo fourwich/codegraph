@@ -43,11 +43,13 @@ def test_skill_body_names_every_binding_level() -> None:
 
 def test_roots_cover_the_published_conventions() -> None:
     roots = skill_roots()
-    assert set(roots) == {"dsh", "project", "claude", "cursor", "agents"}
+    assert set(roots) == {"dsh", "project", "claude", "cursor", "agents", "published"}
     for root in roots.values():
         assert root.name == "skills"
     # The project root is relative to the working directory, not the home.
     assert roots["project"] == Path.cwd() / ".dsh" / "skills"
+    # `published` is the repository's own tree, which is what `npx skills add` scans.
+    assert roots["published"] == Path.cwd() / "skills"
 
 
 def test_committed_skill_matches_the_package_constant() -> None:

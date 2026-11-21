@@ -205,6 +205,10 @@ def skill_roots() -> dict[str, Path]:
         "cursor": Path.cwd() / ".cursor" / "skills",
         # The shared Agent Skills tree: read by Codex, and by Cursor as well.
         "agents": home / ".agents" / "skills",
+        # The repository's own `skills/` directory. This is where `npx skills add
+        # <owner>/<repo>` and the marketplaces look, so a project that publishes a skill
+        # keeps the copy there rather than only in a tool-specific root.
+        "published": Path.cwd() / "skills",
     }
 
 
@@ -251,12 +255,14 @@ def install_skills_command(
         # given a directory tree it never asked for.
         # A project root is only a sensible default inside a repository, where its
         # parent is the working directory itself; elsewhere it would write a stray
-        # tree into whatever directory the caller happened to be in.
-        project_roots = {"project", "cursor"}
+        # tree into whatever directory the caller happened to be in. `published` joins
+        # them for the same reason: a repository's own `skills/` directory is a
+        # publishing decision, not something to create unasked.
+        project_roots = {"project", "cursor", "published"}
         chosen = [
             name
             for name, root in roots.items()
-            if (name not in project_roots or root.parent.exists()) and root.parent.exists()
+            if name not in project_roots and root.parent.exists()
         ]
         if not chosen:
             console.print(
