@@ -68,7 +68,7 @@ class Translator:
         try:
             res = httpx.get(f"{self.base_url}/api/tags", timeout=2.0)
             self._available = res.status_code == 200
-        except Exception:
+        except Exception:  # noqa: BLE001 — a reachability probe: any failure means "down"
             self._available = False
         return self._available
 
@@ -101,7 +101,7 @@ class Translator:
             if res.status_code != 200:
                 return None
             body = res.json()
-        except Exception:
+        except Exception:  # noqa: BLE001 — a missing translation is not an error path
             return None
 
         translated = (body.get("response") or "").strip()

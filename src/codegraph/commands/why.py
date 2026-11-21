@@ -436,6 +436,32 @@ def decision_title(decision: Decision, index: int = 1) -> str:
     return f"Decision #{index}" + (f" · {ref}" if ref else "")
 
 
+
+def _has_index(root: Path, file_path: str) -> bool:
+    """True when a graph database exists for this repository and holds any row.
+
+    An empty or absent database means the setup step was skipped, which is a different
+    answer from "this line has no record". Counting rows rather than checking file
+    existence also catches an `index` run that found nothing to parse.
+    """
+    db_path = find_db(root) or find_db()
+    if db_path is None or not Path(db_path).is_file():
+        return False
+    try:
+        conn = connect(Path(db_path))
+    except sqlite3.Error:
+        return False
+    try:
+        nodes = conn.execute("SELECT COUNT(*) FROM nodes").fetchone()
+        decisions = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+    # Either table having rows means `index` (or a seeded fixture) ran. Only both being
+    # empty means the setup step was skipped.
+    return bool((nodes and nodes[0]) or (decisions and decisions[0]))
+
 def _append_translation(body: Text, original: str) -> None:
     """Append a machine translation beneath `original`, or nothing.
 
@@ -637,6 +663,32 @@ def why_command(
         else:
             console.print(f"[bold red]Invalid argument[/] {exc}")
         raise typer.Exit(code=2) from exc
+
+    if not _has_index(Path.cwd(), file_path):
+        message = t("empty.no_index")
+        if as_json:
+            typer.echo(
+                jsonlib.dumps(
+                    {
+                        "file": file_path,
+                        "line": line,
+                        "node": None,
+                        "decisions": [],
+                        "binding": "none",
+                        "related": [],
+                        "error": message,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            console.print(f"[bold yellow]{message}[/]")
+            console.print(
+                f"[dim]  codegraph index . --depth 50   # "
+                f"{t('empty.no_index_hint')}[/]"
+            )
+        raise typer.Exit(code=1)
 
     node = load_code_node_sqlite(file_path, line)
     raw_decisions, level = load_decisions_sqlite(

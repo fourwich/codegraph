@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-import tree_sitter_typescript as tstypescript
 from tree_sitter import Language, Node, Parser
 
 from codegraph.models import CodeNode, make_uid, normalize_location_path
@@ -14,8 +13,28 @@ from codegraph.parser.base import BaseParser
 
 logger = logging.getLogger(__name__)
 
-_TS_LANGUAGE = Language(tstypescript.language_typescript())
-_TSX_LANGUAGE = Language(tstypescript.language_tsx())
+def _ts_language() -> Language:
+    """Import the TypeScript grammar on first use."""
+    try:
+        import tree_sitter_typescript as tstypescript
+    except ImportError as exc:
+        raise ImportError(
+            "TypeScript support needs an optional grammar: "
+            'pip install "codegraphx[typescript]"'
+        ) from exc
+    return Language(tstypescript.language_typescript())
+
+
+def _tsx_language() -> Language:
+    """Import the TSX grammar on first use."""
+    try:
+        import tree_sitter_typescript as tstypescript
+    except ImportError as exc:
+        raise ImportError(
+            "TSX support needs an optional grammar: "
+            'pip install "codegraphx[typescript]"'
+        ) from exc
+    return Language(tstypescript.language_tsx())
 
 _KIND_MAP = {
     "function_declaration": "function",
@@ -55,7 +74,7 @@ class TypeScriptParser(BaseParser):
         self._calls.clear()
         raw = source.encode("utf-8")
         suffix = Path(rel_path).suffix.lower()
-        lang = _TSX_LANGUAGE if suffix == ".tsx" else _TS_LANGUAGE
+        lang = _tsx_language() if suffix == ".tsx" else _ts_language()
         tree = Parser(lang).parse(raw)
         out: list[CodeNode] = []
         self._walk(

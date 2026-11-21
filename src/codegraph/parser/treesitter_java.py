@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-import tree_sitter_java as tsjava
 from tree_sitter import Language, Parser
 
 from codegraph.models import CodeNode
@@ -14,7 +13,21 @@ from codegraph.parser.base import BaseParser
 from codegraph.parser.common import decl_name, make_node, rel_path, simple_callee
 
 logger = logging.getLogger(__name__)
-_LANG = Language(tsjava.language())
+def _grammar_language() -> Language:
+    """Import the Java grammar on first use.
+
+    The grammar is an optional dependency, so importing it here keeps
+    `import codegraph.parser` working when it is absent. A missing grammar names the
+    extra that installs it instead of failing with a bare ImportError.
+    """
+    try:
+        import tree_sitter_java as tsjava
+    except ImportError as exc:
+        raise ImportError(
+            "Java support needs an optional grammar: "
+            'pip install "codegraphx[java]"'
+        ) from exc
+    return Language(tsjava.language())
 
 KIND_MAP = {
     "class_declaration": "class",
@@ -50,7 +63,7 @@ class JavaParser(BaseParser):
         rel = rel_path(Path(rel_path_)) if "/" not in rel_path_ else rel_path_.replace("\\", "/")
         self._calls.clear()
         raw = source.encode("utf-8")
-        tree = Parser(_LANG).parse(raw)
+        tree = Parser(_grammar_language()).parse(raw)
         out: list[CodeNode] = []
         self._walk(tree.root_node, raw, rel, out, None, "", commit_sha, valid_from)
         return out

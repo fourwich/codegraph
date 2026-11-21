@@ -63,11 +63,33 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "en": "No active code node covers this line",
         "zh": "没有代码节点覆盖这一行",
     },
+    "empty.no_index": {
+        "en": "This repository has no indexed graph yet",
+        "zh": "这个仓库还没有建立索引",
+    },
+    "empty.no_index_hint": {
+        "en": "build the graph first",
+        "zh": "先建立图",
+    },
     "empty.hidden_events": {
         "en": "record(s) hidden — add --include-events to see plain history",
         "zh": "条记录已隐藏 — 加 --include-events 查看纯历史",
     },
     "query.label": {"en": "Query", "zh": "查询"},
+    "index.complete": {"en": "Index complete", "zh": "索引完成"},
+    "index.next_step": {"en": "Next", "zh": "下一步"},
+    "index.nothing_parsed": {
+        "en": "Nothing was indexed",
+        "zh": "没有索引到任何内容",
+    },
+    "index.nothing_parsed_hint": {
+        "en": "No supported source file was found under this path.",
+        "zh": "这个路径下没有找到支持的源文件。",
+    },
+    "index.nothing_parsed_files": {
+        "en": "Supported extensions",
+        "zh": "支持的扩展名",
+    },
     "query.matched": {"en": "matched", "zh": "匹配到"},
     "query.line": {"en": "line-level decision(s)", "zh": "条行级决策"},
     "query.file": {"en": "file-level decision(s)", "zh": "条文件级决策"},

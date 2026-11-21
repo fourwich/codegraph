@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
+from codegraph import __version__
 from codegraph.models import Decision, normalize_location_path, select_decisions
 from codegraph.storage import (
     connect,
@@ -133,7 +134,7 @@ def _decision_json(decision: Decision) -> dict[str, Any]:
 
 def create_app() -> FastAPI:
     """Build the FastAPI application."""
-    app = FastAPI(title="CodeGraph", version="0.1.0")
+    app = FastAPI(title="CodeGraph", version=__version__)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

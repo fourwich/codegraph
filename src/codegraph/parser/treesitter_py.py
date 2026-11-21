@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-import tree_sitter_python as tspython
 from tree_sitter import Language, Node, Parser
 
 from codegraph.models import CodeNode, make_uid, normalize_location_path
@@ -14,7 +13,21 @@ from codegraph.parser.base import BaseParser
 
 logger = logging.getLogger(__name__)
 
-_PY_LANGUAGE = Language(tspython.language())
+def _grammar_language() -> Language:
+    """Import the Python grammar on first use.
+
+    The grammar is an optional dependency, so importing it here keeps
+    `import codegraph.parser` working when it is absent. A missing grammar names the
+    extra that installs it instead of failing with a bare ImportError.
+    """
+    try:
+        import tree_sitter_python as tspython
+    except ImportError as exc:
+        raise ImportError(
+            "Python support needs an optional grammar: "
+            'pip install "codegraphx[python]"'
+        ) from exc
+    return Language(tspython.language())
 
 _KIND_MAP = {
     "function_definition": "function",
@@ -51,7 +64,7 @@ class PythonParser(BaseParser):
         rel = normalize_location_path(rel_path)
         self._calls.clear()
         raw = source.encode("utf-8")
-        tree = Parser(_PY_LANGUAGE).parse(raw)
+        tree = Parser(_grammar_language()).parse(raw)
         out: list[CodeNode] = []
         self._walk(
             tree.root_node,

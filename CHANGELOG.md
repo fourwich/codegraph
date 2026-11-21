@@ -1,7 +1,40 @@
 # Changelog
 
-## Changed
+## 0.2.0
 
+### Added
+
+- `codegraph why <symbol>` resolves a symbol name to its definition, so a caller who
+  knows the function but not the line can still ask. A name that does not exist lists
+  close matches instead of failing silently.
+- `--root` names the repository when a symbol is queried from outside it.
+- Chinese output: card labels, table headers, status words, help text, and error
+  messages are translated. Command names, flag names, and the `binding` tokens stay
+  English because a script or editor reads them.
+- An optional machine translation of decision text, shown beneath the original and
+  marked `机器译`. Project-written records are never presented as this tool's words.
+- `[serve]` and `[llm]` extras. The base install no longer pulls a server framework
+  or an HTTP client for features most users never run.
+
+### Fixed
+
+- A symbol query returned different answers than a path query for the same line: it
+  reported `binding: none` for a line that had a record, because the symbol branch
+  never recorded which database it read.
+- `install-skills --target cursor` wrote to `~/.cursor/skills`, which is not a directory
+  Cursor reads. Cursor uses `.cursor/skills` for project skills and the shared
+  `.agents/skills` tree.
+
+### Changed
+
+- The assistant skill is one file installed from a single source, and a test compares
+  the committed copy against the package constant so they cannot drift.
+
+## 0.1.0
+
+Initial release.
+
+## Changed
 - Index walks real Git history and versions CodeNodes with valid_from / valid_to because time travel must reflect actual commits rather than a static snapshot.
 - Decision extraction prefers commit messages, ADRs, and CHANGELOG over bundled samples because provenance should point at real sources.
 - A second `index` merges into the stored graph instead of clearing it, so re-running the command no longer destroys Git history.

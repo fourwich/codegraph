@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-import tree_sitter_go as tsgo
 from tree_sitter import Language, Parser
 
 from codegraph.models import CodeNode
@@ -14,7 +13,21 @@ from codegraph.parser.base import BaseParser
 from codegraph.parser.common import decl_name, make_node, rel_path, simple_callee, type_name
 
 logger = logging.getLogger(__name__)
-_LANG = Language(tsgo.language())
+def _grammar_language() -> Language:
+    """Import the Go grammar on first use.
+
+    The grammar is an optional dependency, so importing it here keeps
+    `import codegraph.parser` working when it is absent. A missing grammar names the
+    extra that installs it instead of failing with a bare ImportError.
+    """
+    try:
+        import tree_sitter_go as tsgo
+    except ImportError as exc:
+        raise ImportError(
+            "Go support needs an optional grammar: "
+            'pip install "codegraphx[go]"'
+        ) from exc
+    return Language(tsgo.language())
 
 KIND_MAP = {
     "function_declaration": "function",
@@ -49,7 +62,7 @@ class GoParser(BaseParser):
         rel = rel_path_.replace("\\", "/")
         self._calls.clear()
         raw = source.encode("utf-8")
-        tree = Parser(_LANG).parse(raw)
+        tree = Parser(_grammar_language()).parse(raw)
         out: list[CodeNode] = []
         pending: list[tuple[CodeNode, str]] = []
         self._walk(tree.root_node, raw, rel, out, None, "", commit_sha, valid_from, pending)

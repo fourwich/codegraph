@@ -14,7 +14,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from codegraph.decisions.sources import extract_all
 from codegraph.git.diff import get_changed_lines
 from codegraph.git.history import CommitInfo, GitHistory
-from codegraph.i18n import help_text
+from codegraph.i18n import help_text, t
 from codegraph.models import (
     CodeNode,
     Decision,
@@ -917,13 +917,30 @@ def index_command(
         return
 
     console.print()
-    console.print(f"[bold green]Index complete[/]  [bold]{root}[/]")
+    if node_count == 0:
+        # Nothing parsed means the next command has nothing to read. Say so, so the empty
+        # result is not discovered one step later with no explanation. The exit code
+        # stays 0: the index genuinely ran, and a caller may be seeding sources later.
+        console.print(
+            f"[bold yellow]{t('index.nothing_parsed')}[/]  [bold]{root}[/]"
+        )
+        console.print(f"  [dim]{t('index.nothing_parsed_hint')}[/]")
+        console.print(
+            f"  [dim]{t('index.nothing_parsed_files')}: "
+            ".py .ts .tsx .js .java .go .rs .cpp[/]"
+        )
+    else:
+        console.print(f"[bold green]{t('index.complete')}[/]  [bold]{root}[/]")
     console.print(f"  · Commits walked: [bold]{commit_count}[/]")
     console.print(f"  · Nodes: [bold]{node_count}[/]")
     console.print(f"  · Edges: [bold]{edge_count}[/]")
     console.print(f"  · Decisions: [bold]{decision_count}[/]")
     console.print(f"  · Database: [bold]{db_path_for_root(root)}[/]")
-    console.print("[dim]Next: codegraph why <file>:<line>  to view a decision card[/]")
+    if node_count > 0:
+        # Only point at a next step that will actually return something.
+        console.print(
+            f"[dim]{t('index.next_step')}: codegraph why <file>:<line>[/]"
+        )
 
 
 app = typer.Typer(help="Index a codebase from Git history (tree-sitter + SQLite)")

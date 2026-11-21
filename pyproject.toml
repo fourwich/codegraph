@@ -1,6 +1,6 @@
 [project]
 name = "codegraphx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turn code structure, history, and design decisions into one queryable graph"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,6 +42,23 @@ serve = [
 # translation of decision text. Both talk to a local Ollama server over HTTP.
 llm = [
     "httpx>=0.27.0",
+]
+# One extra per grammar. They are additive, not exclusive: install the ones your
+# repository needs, e.g. "codegraphx[python,go]". The grammars ship in the base install
+# too, because splitting 8 MB across six extras costs more in confusion than it saves.
+python = ["tree-sitter-python>=0.23.0"]
+typescript = ["tree-sitter-typescript>=0.23.0"]
+java = ["tree-sitter-java>=0.23.0"]
+go = ["tree-sitter-go>=0.23.0"]
+rust = ["tree-sitter-rust>=0.23.0"]
+cpp = ["tree-sitter-cpp>=0.23.0"]
+all-languages = [
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
+    "tree-sitter-java>=0.23.0",
+    "tree-sitter-go>=0.23.0",
+    "tree-sitter-rust>=0.23.0",
+    "tree-sitter-cpp>=0.23.0",
 ]
 dev = [
     "pytest>=8.0.0",
