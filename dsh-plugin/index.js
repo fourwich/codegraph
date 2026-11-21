@@ -55,7 +55,7 @@ export const name = 'codegraph'
  * is the registry itself. Declaring both keeps the plugin inactive in a deployment
  * that has neither, instead of throwing.
  */
-export const inject = ['tools', 'agents']
+export const inject = ['tools', 'agents', 'systemPrompt']
 
 /**
  * Tunable values live in the row's `config` so a user can change them.
@@ -157,19 +157,50 @@ function summarizeDecision(decision) {
 }
 
 /**
+ * Resolve `@deepseek-ai/dsh-scope`, which provides `createScope`.
+ *
+ * Registering a tool needs a context that carries a scope tag, and `agent.ctx` has
+ * none: `scopeOf(agent.ctx)` returns `undefined`, which `ScopedLayers.effect` reads
+ * as "global". That is why a plain `agent.ctx.tools.register()` lands in the global
+ * layer and stays invisible to a preset-based agent. `createScope(agent.ctx, agent)`
+ * returns a context tagged with that agent as its scope key.
+ */
+function resolveScopeTools() {
+  const anchor = process.env.DSH_INSTALL_DIR || process.cwd()
+  const anchorRequire = createRequire(`${anchor}/package.json`)
+  let entry
+  try {
+    entry = anchorRequire.resolve('@deepseek-ai/dsh-scope')
+  } catch {
+    return undefined
+  }
+  return selfRequire(entry)
+}
+
+/**
+ * Build a context whose scope tag is `key`, or fall back to `ctx` itself.
+ *
+ * The fallback keeps the plugin working on a deployment that lacks the scope
+ * package: registration still succeeds, it just stays global.
+ */
+function scopeFor(ctx, key, scopeTools) {
+  if (scopeTools?.createScope === undefined) return { ctx, dispose: undefined }
+  const created = scopeTools.createScope(ctx, key)
+  return { ctx: created.ctx, dispose: created.dispose }
+}
+
+/**
  * Register the CodeGraph tools.
  *
- * Two registrations, on purpose.
+ * A note on why this is more than one `register()` call.
  *
- * The global one covers agents whose tool list comes from the deployment. But an
- * agent preset defines its own tool rows (`tool-bash`, `tool-fs`, …) and an agent
- * built from a preset resolves tools against its own scope chain, so a global-only
- * registration stays invisible to it. Listening for `agent/created` and registering
- * on that agent's own `ctx` covers presets without editing any preset file — which
- * is what makes this portable across deployments.
+ * `ToolRuntime.register()` runs `this.layers.effect(this.ctx, …)`: it reads the
+ * scope from the **service's own** context, not from the caller, so calling it
+ * through `agent.ctx.tools` still registers globally. Reaching a single agent needs
+ * a context whose scope tag is that agent, which `createScope` produces.
  *
- * `apply` is synchronous because the registry resolves a step's view from the
- * context that was active, and the Harness's own tool plugins register synchronously.
+ * Registering globally as well is deliberate: an agent whose tool list comes from
+ * the deployment sees the global layer, and a preset agent sees its own.
  *
  * @param ctx - registrant context carrying the tool registry and agent events.
  * @param config - the row's configuration, validated against {@link Config}.
@@ -177,7 +208,8 @@ function summarizeDecision(decision) {
 export function apply(ctx, config) {
   trace('apply-entered')
   const defineTool = resolveDefineTool()
-  trace('define-tool-loaded')
+  const scopeTools = resolveScopeTools()
+  trace(`define-tool-loaded scope=${scopeTools ? 'available' : 'absent'}`)
 
   const cliPath = config?.cliPath ?? 'codegraph'
   const timeoutMs = config?.timeoutMs ?? 120000
@@ -188,50 +220,56 @@ export function apply(ctx, config) {
   for (const tool of build()) ctx.tools.register(tool)
   trace('global-tools-registered')
 
-  // 2. Per-agent registration, for agents whose tool list comes from a preset.
+  // 2. Per-agent registration, in that agent's own scope.
   if (registerPerAgent) {
-    /** Tool disposers by agent, so unload and disposal both clean up. */
+    /** Scope disposers by agent, so unload and disposal both clean up. */
     const byAgent = new Map()
 
     ctx.effect(() => {
       const offCreated = ctx.on('agent/created', ({ agent }) => {
-        if (!agent?.ctx?.tools || byAgent.has(agent)) return
+        if (!agent?.ctx || byAgent.has(agent)) return
         const agentId = agent.id ?? agent.session?.id ?? '(unknown)'
+
+        // The tagged context is what makes the registration agent-local.
+        const scope = scopeFor(agent.ctx, agent, scopeTools)
         const disposers = []
         try {
-          for (const tool of build()) disposers.push(agent.ctx.tools.register(tool))
+          for (const tool of build()) disposers.push(scope.ctx.tools.register(tool))
         } catch (error) {
           trace(`agent-register-failed ${agentId} ${error?.code ?? error?.message ?? error}`)
           return
         }
-        byAgent.set(agent, disposers)
+        byAgent.set(agent, { disposers, disposeScope: scope.dispose })
 
-        // Record what the registry reports *after* registering, from this agent's
-        // own view. Registering without an error is not the same as being visible:
-        // a restriction or a mis-scoped layer would still hide the tool, and that
-        // difference is invisible from the outside.
+        // Report what this agent's own view holds after registering. A successful
+        // register is not the same as a visible tool, and that difference is
+        // invisible from outside.
         let visible = '(unavailable)'
         try {
-          const view = agent.ctx.tools.view?.(agent)
-          if (view?.visible) {
-            visible = [...view.visible.keys()].filter((name) => name.startsWith('codegraph_')).join(',')
-              || '(none)'
-          }
+          const view = scope.ctx.tools.view?.(agent)
+          visible = view?.visible
+            ? [...view.visible.keys()].filter((n) => n.startsWith('codegraph_')).join(',') || '(none)'
+            : '(no view)'
         } catch (error) {
           visible = `(view threw: ${error?.message ?? error})`
         }
-        trace(`agent-tools-registered id=${agentId} visible=${visible}`)
+        trace(`agent-tools-registered id=${agentId} scoped=${scopeTools ? 'yes' : 'no'} visible=${visible}`)
       })
 
       const offDisposed = ctx.on('agent/disposed', ({ agent }) => {
-        const disposers = byAgent.get(agent)
-        if (!disposers) return
-        for (const dispose of disposers) {
+        const entry = byAgent.get(agent)
+        if (!entry) return
+        for (const dispose of entry.disposers) {
           try {
             dispose()
           } catch {
             // Already removed with the agent scope.
           }
+        }
+        try {
+          entry.disposeScope?.()
+        } catch {
+          // Scope already gone.
         }
         byAgent.delete(agent)
       })
@@ -239,13 +277,18 @@ export function apply(ctx, config) {
       return () => {
         offCreated()
         offDisposed()
-        for (const disposers of byAgent.values()) {
-          for (const dispose of disposers) {
+        for (const entry of byAgent.values()) {
+          for (const dispose of entry.disposers) {
             try {
               dispose()
             } catch {
               // Already removed.
             }
+          }
+          try {
+            entry.disposeScope?.()
+          } catch {
+            // Scope already gone.
           }
         }
         byAgent.clear()
@@ -256,6 +299,26 @@ export function apply(ctx, config) {
   }
 
   trace('tools-registered')
+
+  // Tell the agent when to reach for the tool. Without this the tool exists but a
+  // model has no reason to prefer it over reading the code and guessing, which is
+  // the behaviour the whole project exists to replace.
+  try {
+    ctx.systemPrompt?.section({
+      name: 'codegraph:why-hint',
+      order: 60,
+      text:
+        'When the user asks why a line of code is written a certain way — rather than '
+        + 'what it does — call `codegraph_why` with `path:line` instead of inferring from '
+        + 'the code. It returns the decision the project recorded (an ADR, a changelog '
+        + 'entry, or a commit message stating a reason), or found:false when the project '
+        + 'wrote nothing down. Report found:false as an answer; never invent a rationale. '
+        + 'Index the repository with `codegraph_index` first if the tool reports no database.',
+    })
+    trace('prompt-section-registered')
+  } catch (error) {
+    trace(`prompt-section-failed ${error?.message ?? error}`)
+  }
 }
 
 /** Build both tool definitions; each registration gets its own instance. */

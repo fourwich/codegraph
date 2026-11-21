@@ -1,6 +1,16 @@
 # CodeGraph for DeepSeek Harness
 
-A DSH plugin that gives an agent two tools over the [codegraph](https://pypi.org/project/codegraphx/) CLI:
+A DSH plugin that puts "why is this line written this way?" where you already are.
+Four ways in, from most to least direct:
+
+| Entry | When |
+|---|---|
+| **Right-click a code block** | The code is on screen. Opens a menu with "Ask why this code is written this way". |
+| **`/why` in the composer** | The line is not on screen yet; inserts a `path:line` template. |
+| `codegraph_why` tool | The agent decides to check before editing unfamiliar code. |
+| A prompt section | Tells the agent that asking is expected, so the tool is not left unused. |
+
+The last two are backed by the [codegraph](https://pypi.org/project/codegraphx/) CLI:
 
 | Tool | Answers |
 |---|---|
@@ -71,22 +81,97 @@ the registry has settled the context it needs.
 ## Why the tools register twice
 
 `apply` registers the tools globally **and** on each agent's own scope, through an
-`agent/created` listener:
+`agent/created` listener.
+
+The second registration is not `agent.ctx.tools.register()`. That call looks
+agent-local and is not: `ToolRuntime.register()` runs
+`this.layers.effect(this.ctx, …)`, reading the scope from the **service's own**
+context, and `ScopedLayers.effect` treats an untagged context as the global layer.
+`agent.ctx` carries no scope tag, so the tool lands in the global layer either way.
+
+Reaching one agent needs a context tagged with that agent, which
+`createScope(agent.ctx, agent)` produces:
 
 ```js
+const { createScope } = require('@deepseek-ai/dsh-scope')
+
 ctx.on('agent/created', ({ agent }) => {
-  for (const tool of buildTools()) agent.ctx.tools.register(tool)
+  const scope = createScope(agent.ctx, agent)   // tagged with this agent
+  for (const tool of buildTools()) scope.ctx.tools.register(tool)
+  // keep scope.dispose for teardown
 })
 ```
 
-A global registration reaches agents whose tool list comes from the deployment. But
-an agent preset (`~/.dsh/.agent-presets/<name>/agent.cordis.yml`) declares its own
-tool rows — `tool-bash`, `tool-fs`, and so on — and an agent built from a preset
-resolves tools against its own scope chain, where a global-only registration stays
-invisible. The per-agent listener covers presets without editing any preset file,
-which is what makes this portable.
+A global registration covers agents whose tool list comes from the deployment. A
+preset agent (`~/.dsh/.agent-presets/<name>/agent.cordis.yml`) declares its own tool
+rows — `tool-bash`, `tool-fs`, … — and resolves tools against its own scope chain,
+where a global-only registration stays invisible. The tagged registration covers
+presets without editing any preset file, which is what makes this portable.
 
 Set `registerPerAgent: false` to turn the second registration off.
+
+The activation log records which path ran:
+
+```
+agent-tools-registered id=session-… scoped=yes visible=codegraph_why,codegraph_index
+```
+
+`scoped=yes` means a tagged context was used. `scoped=no` means the scope package was
+unavailable and the registration fell back to global.
+
+## The client half
+
+`client.js` adds two composer affordances, and is **not** an ES module. The browser
+loads it through a factory that injects `require`, so a static `import react from
+'react'` fails at runtime — the host supplies React, not `node_modules`:
+
+```js
+window.__ModuleLoader__.load({
+  id: `dsh-codegraph`,
+  factory: require => {
+    const react = require('react')
+    exports.apply = apply
+    exports.inject = inject
+    return module.exports
+  },
+})
+```
+
+**A right-click entry on every code block.** The `conversation.chat.markdown.fence`
+slot is declared `kind: 'hoc'`, so a contribution receives the default renderer as
+`children` and wraps it. Wrapping rather than re-implementing keeps syntax
+highlighting and streaming behaviour intact. The wrapper reads `useContextMenu` from
+the slot props and spreads `getTriggerProps(target)` onto a `div`.
+
+**A `/why` slash entry** for a line that is not on screen, via
+`inputTriggers.registerSource`.
+
+### The menu kind is new, and that is allowed
+
+DSH ships `file`, `image`, `directory`, `url`, `workspace`, and `tab` — no `code` or
+`selection`. A menu target kind is a plain string: the registry publishes a kind
+automatically when the first provider registers for it, so the wrapper and its rows
+agree on `codegraph-code` without a separate declaration step.
+
+### What could not be done
+
+Selecting text inside a code block and asking about that selection has no extension
+point in this DSH version. The fence slot exposes the fence's `code` and `lang`, not
+the user's selection, so the entry acts on the whole block. That is a limitation of
+the host, not of this plugin.
+
+### Verifying the client half without a browser
+
+A browser module cannot write files, so the Host `%TEMP%` trace cannot see it.
+Instead `apply()` sets a DOM marker, readable in DevTools:
+
+```js
+document.documentElement.dataset.codegraph           // "applied"
+document.documentElement.dataset.codegraphServices   // "contextMenus,inputTriggers,slots"
+```
+
+`undefined` means the bundle never ran — a `dsh.client` or linking problem, not a
+logic problem.
 
 ## Configuration
 
