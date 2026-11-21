@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+
+- The project page stated "23 packages" and "8 CLI commands". A fresh install pulls 26
+  packages, and the CLI has 9 commands — `install-skills` had shipped without updating any
+  of the six places that state the count. Documentation only: the code is what 0.2.0
+  shipped.
+- `check_materials.py` now verifies the command count against the CLI, so the same drift
+  fails the check instead of reaching a reader.
+
 ## 0.2.0
 
 ### Added
