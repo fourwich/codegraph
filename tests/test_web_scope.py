@@ -166,7 +166,12 @@ def test_dir_fallback_never_reaches_the_whole_graph(tmp_path: Path, monkeypatch)
         "/api/why", params={"file": "CHANGELOG.md", "line": 5}
     ).json()
 
-    assert [d["uid"] for d in body["decisions"]] == ["root"]
+    # A root-level file has no directory topic: the repository root is not a
+    # subject area, so README.md's decision is not an answer about
+    # CHANGELOG.md. Returning it presented an unrelated record as related.
+    # The existing guarantee (never the whole graph) still holds, and now holds
+    # for the sibling case too.
+    assert body["decisions"] == []
 
 
 def test_timeline_respects_scope(tmp_path: Path, monkeypatch) -> None:

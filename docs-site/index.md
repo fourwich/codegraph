@@ -18,7 +18,7 @@ Ask **why is this line here?** and get a decision card — not just a blame line
 ## Quick start
 
 ```bash
-pip install -e ".[dev]"
+pip install codegraphx
 codegraph index .
 codegraph why src/codegraph/cli.py:24
 codegraph graph --at 2026-09-23 --scope src
@@ -26,5 +26,6 @@ codegraph graph --at 2026-09-23 --scope src
 
 ## Links
 
+- [PyPI](https://pypi.org/project/codegraphx/)
 - [GitHub](https://github.com/fourwich/codegraph)
 - [Product site](https://fourwich.github.io/codegraph)

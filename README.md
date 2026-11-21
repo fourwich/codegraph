@@ -1,9 +1,14 @@
 # CodeGraph
 
-![tests](https://img.shields.io/badge/tests-235%20passing-brightgreen)
+[![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
+![tests](https://img.shields.io/badge/tests-239%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
+```bash
+pip install codegraphx
+```
 
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
 
@@ -11,7 +16,7 @@ Why not just ask an AI? Because AI cannot read a closed issue from two years ago
 
 **中文：** 把代码结构、历史变更和设计决策变成一张可查询的图。不只回答「谁改的」，更回答「为什么这么写」。
 
-**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 235 tests
+**Status:** alpha · 8 CLI commands · 7 languages · SQLite storage · 239 tests
 
 > **Note on the Devpost numbers.** The hackathon entry was submitted before two
 > bugs were found while measuring a sixth and seventh project, and the page was
@@ -57,12 +62,14 @@ See [decision extraction](docs/extraction-recall.md) for how `decision` and `eve
 ### Reviewing this in five minutes
 
 ```bash
-pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
-pytest -q                   # 235 tests, no network needed
+pip install codegraphx      # the CLI installs as `codegraph`
 codegraph index .           # builds the graph for this repository
 codegraph why src/codegraph/storage.py:200    # one decision card, end to end
 codegraph graph --at 2026-09-28 --scope src   # the same repository in the past
 ```
+
+Working on the code itself? `pip install -e ".[dev]"` and `pytest -q` (239 tests,
+no network needed).
 
 Then: [the architecture](docs/architecture.md) ·
 [what was measured and what is still a limitation](docs/extraction-recall.md) ·
@@ -71,7 +78,7 @@ Then: [the architecture](docs/architecture.md) ·
 
 ## Status
 
-Verified with `pytest -q` and `codegraph --help` (235 tests passing, over 80% coverage).
+Verified with `pytest -q` and `codegraph --help` (239 tests passing, over 80% coverage).
 
 Every test count in this README and in `docs/` is checked against `pytest --collect-only` by `scripts/check_materials.py`, which runs in CI — a stale number fails the build instead of shipping.
 
@@ -82,7 +89,7 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 - [x] Real Git history traversal
 - [x] Decision extraction from commits, ADRs, CHANGELOG — with a `decision` / `event` tier split
 - [x] Real time-travel queries (`graph --at`)
-- [x] 235 tests passing
+- [x] 239 tests passing
 - [x] Local web visualization (`codegraph serve`)
 - [x] VSCode extension + `why --json` (vsix packaged and installable)
 - [x] Optional Ollama hook (`--use-llm`)
@@ -101,24 +108,25 @@ Every test count in this README and in `docs/` is checked against `pytest --coll
 
 ## Quick start
 
-CodeGraph is not on PyPI yet. Install from source:
+```bash
+pip install codegraphx      # or: uv pip install codegraphx
+
+cd /path/to/any/repo
+codegraph index .           # parse the code, walk its git history
+codegraph why src/main.py:42
+```
+
+Requires Python 3.10+. Nothing else: no Docker, no database server, no API key.
+The first `index` takes a few seconds per hundred commits; everything is stored in
+`.codegraph/graph.db` inside the repository you indexed.
+
+Working from a clone instead:
 
 ```bash
 git clone https://github.com/fourwich/codegraph
 cd codegraph
-
-# recommended: uv
-uv venv
-uv pip install -e ".[dev]"
-
-# or: venv + pip
-python -m venv .venv
-.venv\Scripts\pip install -e ".[dev]"   # Windows
-# source .venv/bin/activate && pip install -e ".[dev]"  # macOS/Linux
-
-# then, from any repository you want to inspect
-codegraph index .
-codegraph why src/main.py:42
+pip install -e ".[dev]"     # or: uv pip install -e ".[dev]"
+pytest -q
 ```
 
 ## Commands (8)

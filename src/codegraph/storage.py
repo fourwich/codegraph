@@ -510,21 +510,24 @@ def query_decisions_for_file(conn: sqlite3.Connection, file_path: str) -> list[D
 def query_decisions_for_dir(
     conn: sqlite3.Connection, file_path: str, limit: int = 5
 ) -> list[Decision]:
-    """Return decisions under the file's directory prefix (directory fallback).
+    """Return decisions recorded for the file's own directory.
 
-    A file at the repository root has the root as its directory, which means
-    records for other root-level files — never records from the whole graph.
+    The directory fallback answers "which decisions does this area of the tree
+    talk about". For a nested directory that is useful: `src/flask/` decisions
+    plausibly concern a file in `src/flask/`.
+
+    For a file at the repository root the answer is meaningless. The root is not a
+    topic, so this used to return every root-level record: asking about `LICENSE`
+    produced four decisions about a changelog entry, with `binding: dir` implying
+    they were related. Nothing in the output distinguished that from a real match.
+
+    Root-level files therefore get no directory fallback. A caller that wants the
+    repository-wide picture has `decisions --timeline` for exactly that, and it
+    says so.
     """
     path = file_path.replace("\\", "/")
     if "/" not in path:
-        rows = conn.execute(
-            "SELECT uid, content, reason, alternatives, status, source, source_ref, timestamp, "
-            "author, file_path, line, constraints, confidence, category, tier FROM decisions "
-            "WHERE file_path NOT LIKE '%/%' "
-            "ORDER BY timestamp DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return [_row_to_decision(row) for row in rows]
+        return []
 
     parent = path.rsplit("/", 1)[0]
     rows = conn.execute(
