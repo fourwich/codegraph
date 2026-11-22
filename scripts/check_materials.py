@@ -31,15 +31,21 @@ CLAIM_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
             r"(?<![\w.])(\d+)\s+(?:tests?(?:\s+passing)?|passing tests)", re.IGNORECASE
         ),
         re.compile(r"tests-(\d+)%20passing"),
+        # Chinese phrasing: `300 个测试`, `300 个测试通过`.
+        re.compile(r"(?<![\w.])(\d+)\s*个测试"),
     ),
     "coverage": (
         re.compile(r"(?<![\w.])(\d+)%\s*coverage", re.IGNORECASE),
         re.compile(r"coverage\s*(\d+)%", re.IGNORECASE),
+        # Chinese phrasing: `覆盖率 85%`, `覆盖率 80% 以上`.
+        re.compile(r"覆盖率\s*(\d+)%"),
     ),
     # The CLI's own surface. `install-skills` shipped without updating four documents, so
     # a reader could check the front page against `codegraph --help` and find them wrong.
     "commands": (
         re.compile(r"(?<![\w.])(\d+)\s+(?:CLI\s+)?commands?\b", re.IGNORECASE),
+        # Chinese phrasing: `9 个命令行命令`, `9 个命令`.
+        re.compile(r"(?<![\w.])(\d+)\s*个(?:命令行)?命令"),
     ),
 }
 
@@ -82,8 +88,13 @@ def actual_command_count() -> int:
 
 
 def material_files() -> list[Path]:
-    """Every published file that may quote a measured number."""
-    files = [ROOT / "README.md", ROOT / "index.html"]
+    """Every published file that may quote a measured number.
+
+    The Chinese README is included: it states the same test count and would otherwise keep
+    a stale figure after `--fix` rewrote the English one. GitHub shows the file the reader
+    clicked, so a wrong number there is just as visible.
+    """
+    files = [ROOT / "README.md", ROOT / "README.zh-CN.md", ROOT / "index.html"]
     files.extend(sorted((ROOT / "docs").rglob("*.md")))
     return [p for p in files if p.is_file() and p.name not in SKIP]
 

@@ -7,7 +7,6 @@ tests pin both halves: labels move, tokens do not.
 
 from __future__ import annotations
 
-import os
 from importlib import reload
 
 import pytest
