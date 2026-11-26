@@ -56,8 +56,26 @@ def test_rst_changelog_is_read(tmp_path: Path) -> None:
 
     assert decisions
     assert all(d.source_ref.startswith("CHANGES.rst · Version 3.2.0") for d in decisions)
-    assert any(d.alternatives for d in decisions)
-    assert {d.tier for d in decisions} == {DecisionTier.DECISION}
+
+    # The fixture has one real decision and two plain changes. Requiring DECISION for all
+    # three is what produced 54 changelog-shaped cards out of 229 records on flask.
+    decision_tier = [d for d in decisions if d.tier is DecisionTier.DECISION]
+    event_tier = [d for d in decisions if d.tier is DecisionTier.EVENT]
+    assert decision_tier, "the 'instead of setuptools' line rejects a named alternative"
+    assert event_tier, "a bare 'Fix parsing IPv6' states no reason"
+
+    # The rejected alternative survives, and the version heading is not on the card.
+    rejected = next(d for d in decision_tier if d.alternatives)
+    assert any("setuptools" in alternative for alternative in rejected.alternatives)
+    assert all(not d.content.startswith("Version ") for d in decisions)
+
+    # `instead of ``302``` is a previous value, not a design: it must not become an
+    # alternative that promotes the line to a decision.
+    for record in decisions:
+        for alternative in record.alternatives:
+            assert alternative.strip("`\"'*_. ").isdigit() is False, (
+                f"bare value accepted as an alternative: {alternative!r}"
+            )
 
 
 def test_any_conventional_changelog_name_is_found(tmp_path: Path) -> None:

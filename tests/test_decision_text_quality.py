@@ -14,6 +14,7 @@ from codegraph.decisions.extractor import (
     is_usable_decision_content,
     polish_alternative,
     polish_decision_content,
+    version_heading,
 )
 from codegraph.models import DecisionSource, DecisionTier
 
@@ -28,10 +29,34 @@ def test_structural_heading_is_dropped() -> None:
     assert polish_decision_content("Removed: the bundled samples") == "The bundled samples"
 
 
-def test_version_heading_is_kept() -> None:
-    """A version tells the reader which release introduced the change."""
+def test_version_heading_is_stripped_from_the_card() -> None:
+    """The heading names a release; on the card it read like a changelog line.
+
+    Dogfooding on flask: 54 of 229 cards opened with `Version X.Y:` and answered
+    "what changed in 3.2" instead of "why is this line here". The release is still
+    available through `version_heading`, which the next test covers.
+    """
     text = "Version 3.2.0: ``redirect`` returns ``303`` by default"
-    assert polish_decision_content(text) == text
+    assert polish_decision_content(text) == "``redirect`` returns ``303`` by default"
+
+
+def test_version_heading_is_recoverable() -> None:
+    """Stripping the heading must not lose which release introduced the change."""
+    release, date = version_heading("Version 3.2.0: ``redirect`` returns ``303``")
+    assert release == "3.2.0"
+    assert date is None
+
+
+def test_version_heading_carries_a_date_when_the_changelog_states_one() -> None:
+    """A dated heading is the only source of a real decision date in a changelog."""
+    release, date = version_heading("0.2 (2011-05-06): Server listens on 127.0.0.1")
+    assert release == "0.2"
+    assert date is not None
+    assert date.date().isoformat() == "2011-05-06"
+
+
+def test_a_non_version_heading_yields_no_release() -> None:
+    assert version_heading("Changed: Drop support for Python 3.9") == ("", None)
 
 
 def test_sentence_is_capitalised_unless_it_starts_with_a_name() -> None:

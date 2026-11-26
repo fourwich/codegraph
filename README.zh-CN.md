@@ -5,7 +5,7 @@
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/codegraphx)](https://pypi.org/project/codegraphx/)
-![tests](https://img.shields.io/badge/tests-310%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-340%20passing-brightgreen)
 ![CI](https://github.com/fourwich/codegraph/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -18,7 +18,7 @@ pip install codegraphx
 
 **为什么不直接问 AI？** 因为 AI 读不到两年前关掉的那个 issue，也因为一条 commit 标题不是答案。CodeGraph 只在记录里写明了**理由**或**被否决的备选方案**时才给出决策卡，其余一律作为历史保留，需要时再显式索取。在 Express.js 上这意味着 **242 条记录里的 22 条决策**，而不是 174 条大多是版本升级的「决策」。
 
-**Status:** alpha · 9 个命令行命令 · 7 种语言 · SQLite 存储 · 310 个测试
+**Status:** alpha · 9 个命令行命令 · 7 种语言 · SQLite 存储 · 340 个测试
 
 > **关于 Devpost 上的数字。** 参赛作品在测第六、第七个项目时发现了两个 bug，
 > 但页面在截止时冻结了。一个是全大写 C 宏被解析成了函数（`fmt` 报了 41.6 万条边，
@@ -64,7 +64,7 @@ codegraph why src/codegraph/storage.py:200    # 一张决策卡，端到端
 codegraph graph --at 2026-09-28 --scope src   # 同一个仓库在过去的样子
 ```
 
-想改代码？`pip install -e ".[dev]"` 然后 `pytest -q`（310 个测试，不需要联网）。
+想改代码？`pip install -e ".[dev]"` 然后 `pytest -q`（340 个测试，不需要联网）。
 
 然后：[架构](docs/architecture.md) ·
 [哪些测了、哪些仍是局限](docs/extraction-recall.md) ·
@@ -73,7 +73,7 @@ codegraph graph --at 2026-09-28 --scope src   # 同一个仓库在过去的样�
 
 ## 状态
 
-用 `pytest -q` 和 `codegraph --help` 验证过（310 个测试通过，覆盖率 80% 以上）。
+用 `pytest -q` 和 `codegraph --help` 验证过（340 个测试通过，覆盖率 80% 以上）。
 
 本 README 和 `docs/` 里每一个测试数都由 `scripts/check_materials.py` 对着 `pytest --collect-only` 核对，该脚本跑在 CI 里 —— 数字过期会让构建失败，而不是发出去。
 
@@ -84,7 +84,7 @@ codegraph graph --at 2026-09-28 --scope src   # 同一个仓库在过去的样�
 - [x] 真实遍历 git 历史
 - [x] 从 commit、ADR、CHANGELOG 抽取决策 —— 带 `decision` / `event` 分层
 - [x] 真实的时间旅行查询（`graph --at`）
-- [x] 310 个测试通过
+- [x] 340 个测试通过
 - [x] 本地网页可视化（`codegraph serve`）
 - [x] VSCode 扩展 + `why --json`（已打包 vsix，可安装）
 - [x] 可选的 Ollama 钩子（`--use-llm`）

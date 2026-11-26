@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from codegraph.models import (
     Decision,
@@ -80,6 +80,34 @@ _ALT_MARKERS: tuple[str, ...] = (
     " instead of ",
     " rather than ",
     " in favor of ",
+)
+
+# A bare number is a previous *value*, not a rejected design: `instead of 302` in a
+# changelog describes what the code used to return. Treating it as an alternative let
+# release notes pass as decision cards. A dotted quad is an address, not a decimal, so it
+# is checked separately and counts as concrete.
+_BARE_NUMBER = re.compile(r"^[~<>]?\d+(?:\.\d+)?%?$")
+_ADDRESS = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$")
+
+# Identifiers, addresses and dotted names are concrete proposals even at one token.
+_CONCRETE_TOKEN = re.compile(r"[`_:/\[\]()\-]|^[A-Za-z][A-Za-z0-9]*\.[A-Za-z]")
+
+# Language keywords that name a value rather than a property. `instead of None` is a
+# concrete decision; `instead of fast` is not.
+_LANGUAGE_VALUES = frozenset(
+    {
+        "none",
+        "null",
+        "nil",
+        "undefined",
+        "true",
+        "false",
+        "nan",
+        "inf",
+        "infinity",
+        "void",
+        "empty",
+    }
 )
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
@@ -186,6 +214,13 @@ _STRUCTURAL_SECTIONS = frozenset(
     }
 )
 _SECTION_PREFIX = re.compile(r"^(?P<head>[^:]{1,40}):\s+(?P<body>\S.*)$")
+# "Version 3.2.0", "v3.2.0", "3.2.0 (2011-05-06)", "Version 0.5". A changelog heading
+# names a release; the date is either parenthesised or absent.
+_VERSION_HEAD = re.compile(
+    r"^(?:version\s+|v)?(?P<version>\d+(?:\.\d+)*)"
+    r"(?:\s*\((?P<date>\d{4}-\d{2}-\d{2})\))?$",
+    re.IGNORECASE,
+)
 # A sentence cut mid-clause starts with one of these; a real decision does not.
 _FRAGMENT_LEADS = frozenset(
     {
@@ -303,6 +338,38 @@ _DANGLING_TAIL = frozenset(
 )
 
 
+def version_heading(text: str) -> tuple[str, datetime | None]:
+    """Return (release, date) from a changelog heading, or ("", None).
+
+    The heading is stripped from the card, so the release it named has to travel separately
+    if a reader is to know when the decision was made. Only an explicit ISO date is trusted;
+    a heading that names a version without one yields `None` and the caller keeps whatever
+    timestamp it already had.
+
+    Args:
+        text: The raw sentence, before the heading is stripped.
+
+    Returns:
+        The release string and its date, both empty/None when the sentence has no heading.
+    """
+    value = " ".join((text or "").split()).strip()
+    match = _SECTION_PREFIX.match(value)
+    if not match:
+        return "", None
+    head = match.group("head").strip()
+    release = _VERSION_HEAD.match(head)
+    if not release:
+        return "", None
+    version = release.group("version")
+    raw_date = release.group("date")
+    if not raw_date:
+        return version, None
+    try:
+        return version, datetime.strptime(raw_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return version, None
+
+
 def clean_clause(text: str) -> str:
     """Trim a clause that was cut mid-phrase.
 
@@ -330,8 +397,13 @@ def polish_decision_content(text: str) -> str:
     """
     value = " ".join((text or "").split()).strip().rstrip(_TRAILING)
     match = _SECTION_PREFIX.match(value)
-    if match and _section_head(match.group("head")) in _STRUCTURAL_SECTIONS:
-        value = match.group("body").strip()
+    if match:
+        head = match.group("head")
+        # A structural heading ("Changed", "Improvements") is pure noise; a version
+        # heading names the release, so it is stripped from the card and recorded as
+        # metadata by `version_heading` below.
+        if _section_head(head) in _STRUCTURAL_SECTIONS or _VERSION_HEAD.match(head.strip()):
+            value = match.group("body").strip()
     value = clean_clause(value)
     first = value.split(" ", 1)[0] if value else ""
     # demo.html and --file are names, not sentences: capitalising them would
@@ -385,6 +457,53 @@ def split_content_reason(sentence: str) -> tuple[str, str]:
     return text[:220], ""
 
 
+def _is_rejected_alternative(alternative: str) -> bool:
+    """True when the clause names an approach that was turned down.
+
+    `instead of 302` describes a previous value, not a rejected design — accepting it let
+    changelog lines through as decisions. A clause qualifies when it is more than one
+    token, or when the single token is a concrete name rather than a bare number.
+
+    Args:
+        alternative: The text after `instead of` / `rather than`, already stripped.
+
+    Returns:
+        Whether this reads as a rejected approach.
+    """
+    clause = (alternative or "").strip()
+    if not clause:
+        return False
+    words = clause.split()
+    if len(words) > 1:
+        return True
+    token = words[0]
+    # Markdown decoration is not evidence of a design choice: strip backticks, quotes and
+    # trailing punctuation, then judge the token itself. Otherwise ``` ``302`` ``` passes
+    # where `302` fails.
+    # The author marked this as code, which is a stronger claim than any character test:
+    # `` `setuptools` `` is a package name, and as a bare lowercase word it would look like
+    # prose. Read the markdown before stripping it.
+    marked_as_code = "`" in token
+
+    # Strip in two passes: the sentence's own punctuation sits outside the markdown, so
+    # ` ``setuptools``. ` needs the period gone before the backticks are.
+    bare = token.strip("\"'*_,;:)]")
+    bare = bare.strip("`\"'*_([:,")
+    if not bare:
+        return False
+    if _ADDRESS.match(bare):
+        return True
+    if _BARE_NUMBER.match(bare):
+        return False
+    if bare.lower() in _LANGUAGE_VALUES:
+        return True
+    if marked_as_code:
+        return True
+    # A single identifier (`safe-buffer`, `node:buffer`) is a proposal; a single English
+    # word (`fast`, `simple`) is a property, not a design.
+    return bool(_CONCRETE_TOKEN.search(bare))
+
+
 def split_decision_parts(sentence: str) -> tuple[str, str, list[str]]:
     """Split one sentence into (content, reason, alternatives).
 
@@ -402,9 +521,12 @@ def split_decision_parts(sentence: str) -> tuple[str, str, list[str]]:
         idx = lower.find(marker)
         if idx > 0 and complete:
             alternative = text[idx + len(marker) :].strip().rstrip(".")
-            if len(alternative.split()) >= 1:
+            if _is_rejected_alternative(alternative):
                 alternatives.append(alternative[:180])
-            text = text[:idx].strip().rstrip(",;:")
+                text = text[:idx].strip().rstrip(",;:")
+            # When the clause is not a real alternative, leave the sentence intact: the
+            # record is a changelog line, and `classify_tier` should see that.
+            break
             break
     content, reason = split_content_reason(text)
     return content, reason, alternatives
