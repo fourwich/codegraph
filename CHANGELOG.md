@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.2
+
+### Fixed
+
+Three defects found by indexing pallets/flask, a repository the author had never read.
+On that repository 229 records produced 54 cards that mostly answered "what changed in
+3.2" instead of "why is this line here".
+
+- A bare value no longer passes as a rejected alternative. `redirect returns 303 instead
+  of 302` produced the alternative `302`, which promoted a changelog line to a decision;
+  `302` is the previous value, not a design that was turned down. An identifier, an
+  address, a backtick-wrapped token, or a multi-word behaviour still counts.
+- A version heading is stripped from the card and returned separately by
+  `version_heading()`. Keeping `Version 3.2.0:` in the content made 54 cards read like
+  release notes.
+- `version_heading()` parses `0.2 (2011-05-06)` and returns the release date, so a
+  changelog decision is no longer dated with the moment `index` ran.
+
+On flask: 229 records -> 50 decisions (22%), one card retaining a `Version` prefix, zero
+bare-value alternatives. Two tests that asserted the old behaviour were replaced with the
+split they should have asserted; that assertion is what let the bug ship.
+
 ## 0.2.1
 
 ### Fixed
