@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -86,11 +88,32 @@ def test_serve_names_the_extra_when_the_web_stack_is_absent() -> None:
     assert "codegraphx[serve]" in result.stdout
 
 
+def _toml_parser():
+    """Return a TOML loader, or None on a Python without one installed.
+
+    `tomllib` is standard from 3.11; `tomli` is the same API for older interpreters.
+    """
+    try:
+        import tomllib
+
+        return tomllib
+    except ModuleNotFoundError:
+        pass
+    try:
+        import tomli
+
+        return tomli
+    except ModuleNotFoundError:
+        return None
+
+
 def test_core_dependencies_exclude_the_extras() -> None:
     """The split is a packaging promise, so it is asserted against the manifest."""
-    import tomllib
+    parser = _toml_parser()
+    if parser is None:
+        pytest.skip("no TOML parser available on this interpreter")
 
-    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    config = parser.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     core = " ".join(config["project"]["dependencies"])
     assert "fastapi" not in core
     assert "uvicorn" not in core

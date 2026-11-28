@@ -24,10 +24,18 @@ def test_help_lists_four_commands() -> None:
 
 
 def test_why_known_location_has_no_fabricated_decision() -> None:
-    """A location with no recorded rationale reports that, not a sample card."""
+    """A location with no recorded rationale reports that, not a sample card.
+
+    Two answers are honest: "no record" when the graph exists but this line has nothing
+    bound, and "no indexed graph yet" when the checkout was never indexed. Both are correct;
+    what must never appear is a decision card the repository never recorded.
+    """
     result = runner.invoke(app, ["why", "src/auth/session.ts:42"])
     assert result.exit_code == 1
-    assert "No decision record found" in result.stdout
+    assert (
+        "No decision record found" in result.stdout
+        or "no indexed graph yet" in result.stdout
+    )
     assert "stateful JWT" not in result.stdout
 
 
@@ -41,10 +49,13 @@ def test_why_bad_format_friendly_error() -> None:
 
 
 def test_why_unknown_location_not_found() -> None:
-    """Valid but unbound location should report missing decisions."""
+    """Valid but unbound location reports a missing decision, or a missing index."""
     result = runner.invoke(app, ["why", "src/unknown/file.ts:1"])
     assert result.exit_code == 1
-    assert "No decision record found" in result.stdout
+    assert (
+        "No decision record found" in result.stdout
+        or "no indexed graph yet" in result.stdout
+    )
 
 
 def test_index_writes_sqlite_with_nodes(tmp_path: Path) -> None:
