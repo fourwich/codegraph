@@ -87,6 +87,28 @@ def actual_command_count() -> int:
     return len(found)
 
 
+def missing_optional_dependencies() -> list[str]:
+    """Return the extras whose packages are not importable in this environment.
+
+    The published numbers describe the full install. CI installs `.[dev]`, so the optional
+    web and language extras are absent and the test count is legitimately smaller. Comparing
+    a partial run against a document that promises the complete one produces false failures.
+    """
+    probes = {
+        "serve": ("fastapi", "uvicorn"),
+        "llm": ("httpx",),
+    }
+    missing: list[str] = []
+    for extra, modules in probes.items():
+        for module in modules:
+            try:
+                __import__(module)
+            except ImportError:
+                missing.append(extra)
+                break
+    return missing
+
+
 def material_files() -> list[Path]:
     """Every published file that may quote a measured number.
 
@@ -211,6 +233,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fix", action="store_true", help="Rewrite stale numbers in place")
     args = parser.parse_args()
+
+    missing = missing_optional_dependencies()
+    if missing:
+        # The documents describe the full install; a partial environment cannot confirm or
+        # contradict them. Say so, and do not rewrite numbers from an incomplete run.
+        print(
+            f"  skipped: {', '.join(sorted(set(missing)))} extra(s) not installed, "
+            "so the measured totals are not comparable with the documents"
+        )
+        print("  install them to verify: pip install -e \".[serve,llm]\"")
+        return 0
 
     expected = {
         "tests": collected_test_count(),
