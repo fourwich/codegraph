@@ -109,7 +109,10 @@ def test_a_real_rejection_still_becomes_a_decision() -> None:
             "Version 3.2.0: ``redirect`` returns ``303`` by default",
             "``redirect`` returns ``303`` by default",
         ),
-        ("Version 0.2: Server listens on 127.0.0.1 by default", "Server listens on 127.0.0.1 by default"),
+        (
+            "Version 0.2: Server listens on 127.0.0.1 by default",
+            "Server listens on 127.0.0.1 by default",
+        ),
         ("v3.2.0: Drop Python 3.9", "Drop Python 3.9"),
         ("0.2 (2011-05-06): Server listens on 127.0.0.1", "Server listens on 127.0.0.1"),
     ],
