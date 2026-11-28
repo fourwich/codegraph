@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+import pytest
 
-from codegraph.web.app import create_app
+# The server framework is an optional extra; without it these tests have nothing to import.
+pytest.importorskip("fastapi", reason="needs the [serve] extra")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from codegraph.web.app import create_app  # noqa: E402
 
 
 def test_health() -> None:

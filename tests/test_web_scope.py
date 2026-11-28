@@ -6,7 +6,12 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+import pytest
+
+# The server framework is an optional extra; without it these tests have nothing to import.
+pytest.importorskip("fastapi", reason="needs the [serve] extra")
+
+from fastapi.testclient import TestClient  # noqa: E402
 
 from codegraph.commands import serve
 from codegraph.models import CodeNode, Decision, DecisionSource, DecisionTier
