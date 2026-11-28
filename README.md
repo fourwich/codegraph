@@ -14,6 +14,10 @@
 pip install codegraphx
 ```
 
+> **Name.** The PyPI package is `codegraphx`; the command is `codegraph`. A different
+> project, [`codegraph`](https://pypi.org/project/codegraph/) by xnuinside, draws
+> dependency graphs — unrelated tool, similar name.
+
 **English:** Turn code structure, git history, and design decisions into one queryable graph — ask “why is this line here?” and get a decision card, not just a blame line.
 
 Why not just ask an AI? Because AI cannot read a closed issue from two years ago — and because a commit subject is not an answer. CodeGraph shows a decision card only when the record states a reason or a rejected alternative; everything else is kept as history you can ask for explicitly. On Express.js that means **22 decisions out of 242 records**, not 174 "decisions" that were mostly version bumps.

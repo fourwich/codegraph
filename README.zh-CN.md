@@ -14,6 +14,10 @@
 pip install codegraphx
 ```
 
+> **名字说明。** PyPI 包名是 `codegraphx`，命令是 `codegraph`。另有一个项目
+> [`codegraph`](https://pypi.org/project/codegraph/)（xnuinside）画的是依赖图，
+> 与本项目无关，只是名字接近。
+
 把代码结构、git 历史和设计决策变成一张可查询的图 —— 问「这行为什么在这儿？」，拿到一张决策卡，而不只是一行 blame。
 
 **为什么不直接问 AI？** 因为 AI 读不到两年前关掉的那个 issue，也因为一条 commit 标题不是答案。CodeGraph 只在记录里写明了**理由**或**被否决的备选方案**时才给出决策卡，其余一律作为历史保留，需要时再显式索取。在 Express.js 上这意味着 **242 条记录里的 22 条决策**，而不是 174 条大多是版本升级的「决策」。
